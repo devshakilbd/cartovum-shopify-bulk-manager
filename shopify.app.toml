@@ -1,0 +1,31 @@
+# Cartovum Bulk Product Manager. Fill client_id with "shopify app config link".
+client_id = ""
+name = "Cartovum Bulk Product Manager"
+application_url = "https://example.com"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+
+[access_scopes]
+# Products and their metafields, inventory tracking and policy, and locations for inventory levels. No customer or order scopes.
+scopes = "read_products,write_products,read_inventory,write_inventory,read_locations"
+
+[auth]
+redirect_urls = ["https://example.com/auth/callback"]
+
+[webhooks]
+api_version = "2026-07"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = ["app/uninstalled"]
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+  # Mandatory compliance topics for App Store apps.
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/compliance"
+  compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]

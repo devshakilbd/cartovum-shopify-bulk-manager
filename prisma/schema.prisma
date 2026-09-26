@@ -1,0 +1,117 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.sqlite"
+}
+
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+// ---------------------------------------------------------------- Cartovum Bulk Product Manager
+// Every row carries its shop. The app never reads or writes another shop's rows (see store.server.ts).
+// JSON is stored as text so the schema works unchanged on SQLite (development) and PostgreSQL (production).
+
+model Operation {
+  id              String    @id @default(uuid())
+  shop            String
+  type            String
+  status          String
+  params          String
+  selectionMode   String
+  filters         String?
+  resolveCursor   String?
+  capped          Boolean   @default(false)
+  userLabel       String
+  total           Int       @default(0)
+  processed       Int       @default(0)
+  changed         Int       @default(0)
+  skipped         Int       @default(0)
+  failed          Int       @default(0)
+  message         String    @default("")
+  revertOf        String?
+  revertedAt      DateTime?
+  revertedBy      String?
+  cancelRequested Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  leaseUntil      DateTime?
+  targets         OperationTarget[]
+
+  @@index([shop, createdAt])
+  @@index([status, leaseUntil])
+}
+
+model OperationTarget {
+  id            Int       @id @default(autoincrement())
+  operationId   String
+  operation     Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  seq           Int
+  productId     String
+  expect        String?
+  state         String    @default("pending")
+  pendingBefore String?
+  result        String?
+
+  @@unique([operationId, productId])
+  @@index([operationId, state, seq])
+}
+
+model ShopConfig {
+  shop      String   @id
+  settings  String
+  decisions String
+  latestDryRunId String?
+  updatedAt DateTime @updatedAt
+}
+
+model DryRunItem {
+  id          Int    @id @default(autoincrement())
+  shop        String
+  operationId String
+  productId   String
+  data        String
+
+  @@index([shop, operationId])
+}
+
+model LocalValueCache {
+  shop      String   @id
+  data      String
+  createdAt DateTime @default(now())
+}
+
+model WebhookEvent {
+  id        String   @id
+  shop      String
+  topic     String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
