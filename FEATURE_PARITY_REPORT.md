@@ -6,7 +6,7 @@ Row numbers refer to [SHOPIFY_FEATURE_PARITY.md](SHOPIFY_FEATURE_PARITY.md). "Li
 |---|---|---|---|---|---|---|
 | 1 | Name search | WP search | Title contains, confirmed exactly | PASS | core: filters | |
 | 2 | SKU list | `_sku IN` | Any variant SKU, ≤500 | PASS | core: filters, paging | |
-| 3 | Category filter | incl. children | Collection | PASS | core: filters (escaping) | Collections have no children. |
+| 3 | Category filter | incl. children | Collection, product type, tags | PASS | core: filters; stage1: type/tag | Collections have no children. |
 | 4 | Stock status filter | meta | Derived | PASS | core: paging, fingerprint | |
 | 5 | Published state | 4 WP statuses | 4 Shopify statuses | PASS | core: filters | |
 | 6 | Attribute conditions (AND, ≤10) | tax/local | Same | PASS | core: filters | |

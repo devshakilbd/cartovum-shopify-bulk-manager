@@ -60,6 +60,12 @@ export class MemoryGateway implements Gateway {
   async getCollections() {
     return this.collections;
   }
+  async getProductTypes() {
+    return [...new Set([...this.products.values()].map((p) => p.productType).filter(Boolean))].sort();
+  }
+  async getProductTags() {
+    return [...new Set([...this.products.values()].flatMap((p) => p.tags))].sort();
+  }
 
   private variant(inventoryItemId: string) {
     for (const p of this.products.values()) for (const v of p.variants) if (v.inventoryItemId === inventoryItemId) return v;

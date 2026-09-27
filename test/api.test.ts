@@ -9,7 +9,7 @@ import { MemoryStore } from "../app/lib/core/memory-store";
  * progress, results, revert, dry run, CSV, settings, and input hardening.
  */
 
-const state = vi.hoisted(() => ({ scope: "read_products,write_products,read_inventory,write_inventory", shop: "a.myshopify.com", store: null as unknown as MemoryStore, gw: null as unknown as MemoryGateway }));
+const state = vi.hoisted(() => ({ scope: "write_products,write_inventory", shop: "a.myshopify.com", store: null as unknown as MemoryStore, gw: null as unknown as MemoryGateway }));
 
 vi.mock("../app/shopify.server", () => ({
   authenticate: { admin: async () => ({ session: { shop: state.shop, onlineAccessInfo: { associated_user_scope: state.scope } }, admin: {} }) },
@@ -70,6 +70,18 @@ describe("api", () => {
     expect((await get("operation", `?id=${rv.body.operation.id}`)).body.operation.changed).toBe(12);
   });
 
+  it("config lists product types and tags, and search filters by them", async () => {
+    const [a, b] = [...state.gw.products.values()];
+    Object.assign(a, { productType: "Wheel", tags: ["sale"] });
+    Object.assign(b, { productType: "Tyre", tags: ["sale", "winter"] });
+    const config = await get("config");
+    expect(config.body).toMatchObject({ productTypes: ["Tyre", "Wheel"], productTags: ["sale", "winter"] });
+    const r = await post("search", { filters: { tags: "sale", productType: "tyre" } });
+    expect(r.body.items.map((i: { id: string }) => i.id)).toEqual([b.id]);
+    expect(r.body.items[0]).toMatchObject({ productType: "Tyre", tags: ["sale", "winter"] });
+    expect(r.body.total).toBeNull();
+  });
+
   it("refuses bad input with a readable message", async () => {
     expect((await post("start", { type: "attributes", params: { op: "add_terms", attribute: "shared.colour", terms: ["Purple"] }, selectionMode: "IDS", ids: [state.gw.products.keys().next().value] })).body.error).toMatch(/does not exist/);
     expect((await post("start", { type: "stock", params: { stockStatus: "x" }, selectionMode: "IDS", ids: [] })).body.error).toBe("Choose a stock status.");
@@ -78,13 +90,13 @@ describe("api", () => {
   });
 
   it("refuses writes from a staff member without write permission", async () => {
-    state.scope = "read_products,write_products";
+    state.scope = "write_products";
     const ids = [state.gw.products.keys().next().value];
     const r = await post("start", { type: "stock", params: { stockStatus: "outofstock" }, selectionMode: "IDS", ids });
     expect(r.body.error).toMatch(/permission to change products or inventory/);
-    state.scope = "read_products";
+    state.scope = "";
     expect((await post("settings", {})).body.error).toMatch(/permission/);
-    state.scope = "read_products,write_products,read_inventory,write_inventory";
+    state.scope = "write_products,write_inventory";
     expect((await post("start", { type: "stock", params: { stockStatus: "outofstock" }, selectionMode: "IDS", ids })).status).toBe(200);
   });
 

@@ -1,7 +1,7 @@
 import { applyAttributeOne, parseOp, revertAttributesOne } from "./attributes";
 import { blockingNote, convertOne, planProduct } from "./convert";
 import { canonical, primarySku } from "./fingerprint";
-import { matches, parseFilters, shopifyQuery } from "./filters";
+import { matches, normaliseFilters, parseFilters, shopifyQuery } from "./filters";
 import type { Gateway } from "./gateway";
 import { applyStockOne, revertStockOne, row, snap, type StockSnapshot } from "./stock";
 import type { Operation, OperationType, Store, Target } from "./store";
@@ -212,7 +212,7 @@ function context(store: Store, gw: Gateway, settings: Ctx["settings"], shop: str
 
 /** Scan one page of the catalogue and add the products that match (select all matching / dry run). */
 async function resolveStep(store: Store, gw: Gateway, op: Operation, ctx: Ctx): Promise<void> {
-  const filters = op.filters as Filters | null;
+  const filters = op.filters ? normaliseFilters(op.filters as Partial<Filters>) : null;
   const query = filters ? shopifyQuery(filters) : "";
   const page = await gw.searchProducts(query, RESOLVE_PAGE, op.resolveCursor);
 

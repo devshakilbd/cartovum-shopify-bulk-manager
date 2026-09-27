@@ -1,22 +1,21 @@
-# Development configuration for Cartovum Bulk Product Manager.
-# Link it to the app that already exists in your Dev Dashboard with "npm run config:link"
-# (fills client_id; client_id is not a secret). During "npm run dev" the Shopify CLI replaces
-# application_url and redirect_urls with its tunnel URL, so the values below are placeholders.
-# Production uses shopify.app.production.toml (see README, "Production").
+# Production configuration for Cartovum Bulk Product Manager.
+# Select it with "npm run config:use shopify.app.production.toml", then "npm run deploy".
+# The domain below is the planned production URL; it must be live (HTTPS, this app running)
+# before deploying this configuration, and SHOPIFY_APP_URL on the server must match it.
 client_id = ""
 name = "Cartovum Bulk Product Manager"
-application_url = "https://localhost"
+application_url = "https://app.cartovumagency.com"
 embedded = true
 
 [build]
-automatically_update_urls_on_dev = true
+automatically_update_urls_on_dev = false
 
 [access_scopes]
 # Minimum scopes; write scopes include read access. See ACCESS_SCOPES.md.
 scopes = "write_products,write_inventory"
 
 [auth]
-redirect_urls = ["https://localhost/auth/callback"]
+redirect_urls = ["https://app.cartovumagency.com/auth/callback"]
 
 [webhooks]
 api_version = "2026-07"

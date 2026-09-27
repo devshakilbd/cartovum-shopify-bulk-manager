@@ -72,6 +72,12 @@ const COLLECTIONS = `#graphql
     collections(first: 250, after: $after, sortKey: TITLE) { nodes { id title } pageInfo { hasNextPage endCursor } }
   }`;
 
+const PRODUCT_TYPES = `#graphql
+  query CartovumProductTypes { productTypes(first: 1000) { nodes } }`;
+
+const PRODUCT_TAGS = `#graphql
+  query CartovumProductTags { productTags(first: 5000) { nodes } }`;
+
 const SET_TRACKED = `#graphql
   mutation CartovumTracked($id: ID!, $input: InventoryItemInput!) {
     inventoryItemUpdate(id: $id, input: $input) { inventoryItem { id tracked } userErrors { field message } }
@@ -274,6 +280,15 @@ export class ShopifyGateway implements Gateway {
       after = data.collections.pageInfo.hasNextPage && out.length < 2500 ? data.collections.pageInfo.endCursor : null;
     } while (after);
     return out;
+  }
+
+  /** Suggestions only: the filters accept any value, so a very long list being cut off loses nothing. */
+  async getProductTypes() {
+    return ((await this.read(PRODUCT_TYPES, {})).productTypes.nodes as string[]).filter(Boolean);
+  }
+
+  async getProductTags() {
+    return ((await this.read(PRODUCT_TAGS, {})).productTags.nodes as string[]).filter(Boolean);
   }
 
   async setInventoryTracked(inventoryItemId: string, tracked: boolean) {

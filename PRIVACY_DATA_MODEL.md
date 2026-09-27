@@ -6,11 +6,11 @@ The app works on catalogue data only. It requests no customer, order or staff-pe
 
 | Data | Why | Scope |
 |---|---|---|
-| Products: title, handle, status, vendor, type, tags, description (hashed on read), template, category, collections, media IDs, options | Search, filters, and the before/after fingerprint that proves nothing else changed | `read_products` |
-| Variants: SKU, price, compare-at price, barcode, selected options, inventory policy | Search and fingerprint; policy is written for stock status | `read_products`, `write_products` |
-| Inventory items and levels (tracked flag, on-hand and available per location) | Stock status and the quantity-managed protection; the tracked flag is written | `read_inventory`, `write_inventory`, `read_locations` |
-| Product metafields (text types) and metafield definitions | Attributes | `read_products`, `write_products` |
-| Collections (ID, title) | Collection filter | `read_products` |
+| Products: title, handle, status, vendor, type, tags, description (hashed on read), template, category, collections, media IDs, options | Search, filters, and the before/after fingerprint that proves nothing else changed | `write_products` (read access included) |
+| Variants: SKU, price, compare-at price, barcode, selected options, inventory policy | Search and fingerprint; policy is written for stock status | `write_products` |
+| Inventory items and levels (tracked flag, on-hand and available per location) | Stock status and the quantity-managed protection; the tracked flag is written | `write_inventory` (read access, including locations, included) |
+| Product metafields (text types) and metafield definitions | Attributes | `write_products` |
+| Collections (ID, title) | Collection filter | `write_products` (read access included) |
 | Staff member name/email from the online token | Recorded as "who started this run" | none extra |
 
 ## What is stored, why, and for how long

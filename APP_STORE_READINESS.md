@@ -5,7 +5,7 @@
 - Embedded app on Shopify's current React Router template, App Bridge and Polaris web components.
 - Admin GraphQL API **2026-07** (latest stable at build time); every GraphQL document validated against that schema (`npm run validate:graphql`).
 - Managed install / token exchange, expiring offline tokens, online tokens for per-staff permission checks.
-- Minimum scopes: `read_products, write_products, read_inventory, write_inventory, read_locations`. No customer or order scopes.
+- Minimum scopes: `write_products, write_inventory` (write scopes include read access). No customer or order scopes. See [ACCESS_SCOPES.md](ACCESS_SCOPES.md).
 - Mandatory compliance webhooks (`customers/data_request`, `customers/redact`, `shop/redact`) and `app/uninstalled`, HMAC-verified and idempotent.
 - `AppDistribution.AppStore`.
 - Privacy and data handling documented ([PRIVACY_DATA_MODEL.md](PRIVACY_DATA_MODEL.md)).

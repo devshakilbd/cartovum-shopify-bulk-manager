@@ -14,6 +14,9 @@ export interface Gateway {
   /** Local attribute keys and their values in use, with product counts. */
   getLocalAttributeValues(): Promise<Record<string, { value: string; count: number }[]>>;
   getCollections(): Promise<{ id: string; title: string }[]>;
+  /** Product types and tags in use, for the filter suggestions. */
+  getProductTypes(): Promise<string[]>;
+  getProductTags(): Promise<string[]>;
 
   setInventoryTracked(inventoryItemId: string, tracked: boolean): Promise<void>;
   setInventoryPolicy(productId: string, variantId: string, policy: "DENY" | "CONTINUE"): Promise<void>;

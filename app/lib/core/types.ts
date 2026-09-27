@@ -87,6 +87,10 @@ export interface Filters {
   search: string;
   skus: string[];
   collectionId: string;
+  /** Exact product type, compared ignoring case. Empty means any. */
+  productType: string;
+  /** Tags the product must carry, all of them (AND), compared ignoring case. */
+  tags: string[];
   stockStatus: StockStatus | "";
   status: ProductStatus | "";
   conditions: AttributeCondition[];
@@ -148,3 +152,4 @@ export const BATCH_SIZE = 10;
 export const MAX_PER_REQUEST = 25;
 export const MAX_CONDITIONS = 10;
 export const MAX_SKUS = 500;
+export const MAX_TAGS = 10;

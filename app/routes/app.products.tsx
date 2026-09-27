@@ -11,12 +11,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 type Global = { key: string; label: string; type: string; choices: string[] };
-type Config = { globals: Global[]; collections: { id: string; title: string }[]; localValues: Record<string, { value: string; count: number }[]>; maxConditions: number };
+type Config = { globals: Global[]; collections: { id: string; title: string }[]; productTypes: string[]; productTags: string[]; localValues: Record<string, { value: string; count: number }[]>; maxConditions: number };
 type Row = {
   id: string;
   name: string;
   sku: string;
   status: string;
+  productType: string;
+  tags: string[];
   stockStatus: string;
   tracked: boolean;
   inventory: number;
@@ -28,10 +30,10 @@ type Row = {
   attributes: { key: string; kind: string; values: string[] }[];
 };
 type Condition = { attribute: string; value: string };
-type Filters = { search: string; skus: string; collectionId: string; stockStatus: string; status: string; conditions: Condition[]; perPage: number };
+type Filters = { search: string; skus: string; collectionId: string; productType: string; tags: string; stockStatus: string; status: string; conditions: Condition[]; perPage: number };
 type Preview = { rows: { id: string; name: string; sku: string; status: string; message: string }[] };
 
-const EMPTY: Filters = { search: "", skus: "", collectionId: "", stockStatus: "", status: "", conditions: [{ attribute: "", value: "" }], perPage: 50 };
+const EMPTY: Filters = { search: "", skus: "", collectionId: "", productType: "", tags: "", stockStatus: "", status: "", conditions: [{ attribute: "", value: "" }], perPage: 50 };
 const SELECTION_KEY = "cartovum-selection";
 
 /** Selected products survive page changes and reloads within the tab. */
@@ -218,6 +220,30 @@ export default function Products() {
                 </select>
               )}
             </Field>
+            <Field label="Product type" hint="Exact type, ignoring case.">
+              {(id) => (
+                <>
+                  <input id={id} list={`${id}-types`} style={control} value={form.productType} onChange={(e) => setForm({ ...form, productType: e.target.value })} placeholder="Any product type" />
+                  <datalist id={`${id}-types`}>
+                    {config?.productTypes.map((t) => (
+                      <option key={t} value={t} />
+                    ))}
+                  </datalist>
+                </>
+              )}
+            </Field>
+            <Field label="Tags" hint="Comma separated. Products must have every tag.">
+              {(id) => (
+                <>
+                  <input id={id} list={`${id}-tags`} style={control} value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="Any tags" />
+                  <datalist id={`${id}-tags`}>
+                    {config?.productTags.map((t) => (
+                      <option key={t} value={t} />
+                    ))}
+                  </datalist>
+                </>
+              )}
+            </Field>
             <Field label="Stock status">
               {(id) => (
                 <select id={id} style={control} value={form.stockStatus} onChange={(e) => setForm({ ...form, stockStatus: e.target.value })}>
@@ -374,7 +400,12 @@ export default function Products() {
                           {r.name}
                         </a>
                       </div>
-                      {r.multiVariant && <div style={{ fontSize: 12, color: "#616161" }}>{r.variants} variants</div>}
+                      {(r.productType || r.multiVariant) && (
+                        <div style={{ fontSize: 12, color: "#616161" }}>
+                          {[r.productType, r.multiVariant ? `${r.variants} variants` : ""].filter(Boolean).join(" · ")}
+                        </div>
+                      )}
+                      {r.tags.length > 0 && <div style={{ fontSize: 12, color: "#616161" }}>Tags: {r.tags.slice(0, 5).join(", ")}{r.tags.length > 5 ? "…" : ""}</div>}
                     </td>
                     <td style={td}>{r.sku}</td>
                     <td style={td}>{r.status.toLowerCase()}</td>
@@ -548,6 +579,8 @@ function describeFilters(f: Filters, config: Config | null) {
   if (f.search) parts.push(`name contains "${f.search}"`);
   if (f.skus.trim()) parts.push(`SKUs: ${f.skus.split(/[\n,]+/).filter(Boolean).length}`);
   if (f.collectionId) parts.push(`collection: ${config?.collections.find((c) => c.id === f.collectionId)?.title ?? f.collectionId}`);
+  if (f.productType.trim()) parts.push(`product type: ${f.productType.trim()}`);
+  if (f.tags.trim()) parts.push(`tags: ${f.tags.split(",").map((t) => t.trim()).filter(Boolean).join(" + ")}`);
   if (f.stockStatus) parts.push(`stock: ${STOCK_LABELS[f.stockStatus]}`);
   if (f.status) parts.push(`status: ${f.status.toLowerCase()}`);
   for (const c of f.conditions.filter((x) => x.attribute)) parts.push(`${c.attribute.replace(/^option:/, "")}${c.value ? ` = ${c.value}` : " is set"}`);

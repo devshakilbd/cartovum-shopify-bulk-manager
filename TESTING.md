@@ -1,7 +1,7 @@
 # Testing
 
 ```bash
-npm test                  # 61 automated tests (vitest)
+npm test                  # 72 automated tests (vitest)
 npm run typecheck
 npm run lint
 npm run graphql-codegen && npm run validate:graphql   # checks every GraphQL document against the 2026-07 schema
@@ -17,7 +17,8 @@ npm run build
 | `test/safety.test.ts` | Safety / failure injection | Unrelated field changed during write, write reported OK but did not stick, Shopify userError, timeout that actually applied (verified, not retried), product deleted mid-run, revert, revert conflict (Blue → Green is never overwritten, message shows expected/current), stock revert conflict, batches of 10, stop after batch, oversized batch refused, crash mid-write (no double apply, still revertable), server-side select all, shop isolation, pruning |
 | `test/scale.test.ts` | Large catalogue | 10, 100, 1,000 and 10,000 simulated products: select all matching, batching, 1-in-97 injected write failures, exact counts, a result for every product, memory bound, full revert |
 | `test/gateway.test.ts` | Integration (mocked HTTP) | GraphQL → product mapping, global vs local vs foreign metafields, inventory levels, IDs as variables, throttle retry with backoff, writes never retried, uncertain transport failures, userErrors surfaced, exact mutation variables |
-| `test/api.test.ts` | Endpoint | Real route handlers: search + cursor + total, select all → preview (no writes) → start → results → revert, readable validation errors, staff permission refusal, cross-shop isolation, CSV with formula guard, decision locking and validation, settings sanitising |
+| `test/stage1.test.ts` | Unit + flow | Product type and tag filters: parsing (trim, de-duplicate, max 10), escaped search string, not counted as exact, type match ignoring case, every tag required, combined with every existing filter, cursor paging, select all matching by type + tag, older saved filter snapshots still resolve; app URL: origin trimming, redirect URL, localhost allowed, production refuses missing/http/invalid/path URLs |
+| `test/api.test.ts` | Endpoint | Real route handlers: search + cursor + total, product types/tags in config and search by them, select all → preview (no writes) → start → results → revert, readable validation errors, staff permission refusal, cross-shop isolation, CSV with formula guard, decision locking and validation, settings sanitising |
 
 Fixtures (`app/lib/core/memory-gateway.ts`): simple products, multi-variant products, products with options, metafields, tracked/untracked inventory, quantity-managed variants, duplicate and conflicting values.
 

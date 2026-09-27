@@ -1,7 +1,7 @@
 import type { Gateway } from "./gateway";
 import { productStockStatus } from "./fingerprint";
 import type { AttributeCondition, Filters, ProductState, ProductStatus, StockStatus } from "./types";
-import { MAX_CONDITIONS, MAX_SKUS, PRODUCT_STATUSES, STOCK_STATUSES } from "./types";
+import { MAX_CONDITIONS, MAX_SKUS, MAX_TAGS, PRODUCT_STATUSES, STOCK_STATUSES } from "./types";
 
 /**
  * Filters (v1.3.9 SWBM_Query). Input from the browser is never trusted: everything is parsed into a
@@ -10,6 +10,7 @@ import { MAX_CONDITIONS, MAX_SKUS, PRODUCT_STATUSES, STOCK_STATUSES } from "./ty
  * Semantics kept from v1.3.9:
  * - name search, SKU list (one per line or comma separated, up to 500), category (collection),
  *   stock status, product status;
+ * - added for Shopify: product type (exact, ignoring case) and tags (the product must carry every one);
  * - up to 10 attribute conditions, combined with AND: a product must match every one;
  * - a condition with no value means "has this attribute"; a value is compared case-insensitively.
  */
@@ -44,11 +45,21 @@ export function parseFilters(raw: Record<string, unknown>): Filters {
     search: str(raw.search),
     skus,
     collectionId: isGid(raw.collectionId, "Collection") ? raw.collectionId : "",
+    productType: str(raw.productType),
+    tags: [...new Set(str(raw.tags, 2000).split(",").map((t) => t.trim()).filter(Boolean))].slice(0, MAX_TAGS),
     stockStatus: STOCK_STATUSES.includes(raw.stockStatus as StockStatus) ? (raw.stockStatus as StockStatus) : "",
     status: PRODUCT_STATUSES.includes(raw.status as ProductStatus) ? (raw.status as ProductStatus) : "",
     conditions: parseConditions(raw.conditions),
     perPage: [25, 50, 100, 200].includes(perPage) ? perPage : 50,
   };
+}
+
+/**
+ * A stored filter snapshot, completed with defaults for fields added later (product type, tags), so a
+ * run saved before a field existed still resolves exactly as it did.
+ */
+export function normaliseFilters(f: Partial<Filters>): Filters {
+  return { search: "", skus: [], collectionId: "", productType: "", tags: [], stockStatus: "", status: "", conditions: [], perPage: 50, ...f };
 }
 
 /** Quote a value for Shopify search syntax. Backslashes and quotes are escaped; nothing else is interpreted. */
@@ -66,6 +77,8 @@ export function shopifyQuery(f: Filters): string {
   if (f.search) parts.push(`title:*${f.search.replace(/[\\"():*]/g, " ").trim()}*`);
   if (f.skus.length) parts.push("(" + f.skus.map((s) => `sku:${quote(s)}`).join(" OR ") + ")");
   if (f.collectionId) parts.push(`collection_id:${f.collectionId.split("/").pop()}`);
+  if (f.productType) parts.push(`product_type:${quote(f.productType)}`);
+  for (const tag of f.tags) parts.push(`tag:${quote(tag)}`);
   if (f.status) parts.push(`status:${f.status.toLowerCase()}`);
   // Attribute conditions are not sent: metafield search only works for definitions with admin filtering
   // switched on, and would silently match nothing otherwise. They are applied exactly by matches().
@@ -74,7 +87,8 @@ export function shopifyQuery(f: Filters): string {
 
 /** True when shopifyQuery() matches exactly what matches() does, so Shopify's own count is the total. */
 export function queryIsExact(f: Filters): boolean {
-  return !f.search && !f.stockStatus && f.conditions.length === 0;
+  // Product type and tag are sent to Shopify but confirmed here too, so they are not counted as exact.
+  return !f.search && !f.stockStatus && !f.productType && !f.tags.length && f.conditions.length === 0;
 }
 
 const eq = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
@@ -92,6 +106,8 @@ export function matches(p: ProductState, f: Filters): boolean {
   if (f.search && !p.title.toLowerCase().includes(f.search.toLowerCase())) return false;
   if (f.skus.length && !p.variants.some((v) => f.skus.some((s) => v.sku === s))) return false;
   if (f.collectionId && !p.collectionIds.includes(f.collectionId)) return false;
+  if (f.productType && !eq(p.productType, f.productType)) return false;
+  if (f.tags.length && !f.tags.every((t) => p.tags.some((pt) => eq(pt, t)))) return false;
   if (f.status && p.status !== f.status) return false;
   if (f.stockStatus && productStockStatus(p) !== f.stockStatus) return false;
   return f.conditions.every((c) => matchesCondition(p, c));

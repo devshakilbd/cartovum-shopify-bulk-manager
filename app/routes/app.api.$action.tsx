@@ -47,6 +47,8 @@ function tableRow(p: ProductState) {
     name: p.title,
     sku: primarySku(p),
     status: p.status,
+    productType: p.productType,
+    tags: p.tags,
     stockStatus: productStockStatus(p),
     tracked: p.variants.some((v) => v.tracked),
     inventory: p.variants.reduce((sum, v) => sum + v.levels.reduce((s, l) => s + l.available, 0), 0),
@@ -138,8 +140,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   if (params.action === "config") {
     const gw = await gatewayFor(shop, admin);
-    const [globals, collections, locals, settings, decisions] = await Promise.all([gw.getGlobalAttributes(), gw.getCollections(), localValues(shop, gw), store.getSettings(shop), store.getDecisions(shop)]);
-    return json({ globals, collections, localValues: locals, settings, decisions, batchSize: BATCH_SIZE, maxConditions: MAX_CONDITIONS });
+    const [globals, collections, productTypes, productTags, locals, settings, decisions] = await Promise.all([gw.getGlobalAttributes(), gw.getCollections(), gw.getProductTypes(), gw.getProductTags(), localValues(shop, gw), store.getSettings(shop), store.getDecisions(shop)]);
+    return json({ globals, collections, productTypes, productTags, localValues: locals, settings, decisions, batchSize: BATCH_SIZE, maxConditions: MAX_CONDITIONS });
   }
 
   if (params.action === "operations") {
