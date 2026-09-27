@@ -2,7 +2,7 @@
 # Select it with "npm run config:use shopify.app.production.toml", then "npm run deploy".
 # The domain below is the planned production URL; it must be live (HTTPS, this app running)
 # before deploying this configuration, and SHOPIFY_APP_URL on the server must match it.
-client_id = ""
+client_id = "23cb842307346f58ce89b3a780536e31"
 name = "Cartovum Bulk Product Manager"
 application_url = "https://app.cartovumagency.com"
 embedded = true

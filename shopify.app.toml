@@ -3,7 +3,7 @@
 # (fills client_id; client_id is not a secret). During "npm run dev" the Shopify CLI replaces
 # application_url and redirect_urls with its tunnel URL, so the values below are placeholders.
 # Production uses shopify.app.production.toml (see README, "Production").
-client_id = ""
+client_id = "23cb842307346f58ce89b3a780536e31"
 name = "Cartovum Bulk Product Manager"
 application_url = "https://localhost"
 embedded = true
