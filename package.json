@@ -19,7 +19,8 @@
     "vite": "vite",
     "typecheck": "react-router typegen && tsc --noEmit",
     "test": "vitest run",
-    "validate:graphql": "node scripts/validate-graphql.mjs"
+    "validate:graphql": "node scripts/validate-graphql.mjs",
+    "seed:dev": "vite-node --config vitest.config.ts scripts/seed-dev-store.ts --"
   },
   "type": "module",
   "engines": {
@@ -61,6 +62,7 @@
     "prettier": "^3.6.2",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
+    "vite-node": "^3.2.4",
     "vitest": "^3.2.7"
   },
   "workspaces": {

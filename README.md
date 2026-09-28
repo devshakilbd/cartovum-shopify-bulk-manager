@@ -32,6 +32,7 @@ Documentation: [Migration map](MIGRATION_MAP.md) · [Access scopes](ACCESS_SCOPE
 | Production build | `npm run build` |
 | Production start (after build) | `npm run setup && npm run start` |
 | Push app config (URLs, scopes, webhooks) to Shopify | `npm run deploy` |
+| Development-store test data (plan / preflight / apply / verify) | `npm run seed:dev` — see [TESTING.md](TESTING.md#development-store-seed) |
 
 ## Local development
 
