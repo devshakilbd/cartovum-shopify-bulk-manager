@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AdminClient } from "../../app/lib/gateway.server";
 import { API_VERSION, STORE } from "./spec";
@@ -26,20 +26,24 @@ export function cliAdmin(log: (line: string) => void = () => undefined): CliAdmi
     calls: 0,
     async graphql(query, options) {
       const id = `${process.pid}-${++n}`;
-      const q = join(TMP, `q-${id}.graphql`);
-      const v = join(TMP, `v-${id}.json`);
-      const o = join(TMP, `o-${id}.json`);
+      // The CLI is given paths relative to the project folder: with an absolute Windows path it reported
+      // success but wrote no output file.
+      const rel = (name: string) => `.seed-tmp/${name}`;
+      const [qRel, vRel, oRel] = [rel(`q-${id}.graphql`), rel(`v-${id}.json`), rel(`o-${id}.json`)];
+      const [q, v, o] = [qRel, vRel, oRel].map((r) => join(ROOT, r));
       writeFileSync(q, query);
       writeFileSync(v, JSON.stringify(options?.variables ?? {}));
       const name = /(?:query|mutation)\s+(\w+)/.exec(query)?.[1] ?? "anonymous";
       log(`  → ${name}`);
       client.calls++;
-      const args = ["shopify", "app", "execute", "--config", "shopify.app.toml", "--store", STORE, "--version", API_VERSION, "--query-file", q, "--variable-file", v, "--output-file", o, "--no-color"];
+      const args = ["shopify", "app", "execute", "--config", "shopify.app.toml", "--store", STORE, "--version", API_VERSION, "--query-file", qRel, "--variable-file", vRel, "--output-file", oRel, "--no-color"];
+      // npx is a .cmd file on Windows, which Node only starts through a shell. Every argument is fixed text
+      // or a generated file name without spaces or shell characters.
       const run = spawnSync("npx", args, { cwd: ROOT, shell: process.platform === "win32", encoding: "utf8", timeout: 180_000 });
+      const cliOutput = () => `${run.stdout ?? ""}\n${run.stderr ?? ""}`.trim().slice(-1200);
       try {
-        if (run.status !== 0) {
-          throw new Error(`shopify app execute failed (${name}, exit ${run.status}): ${(run.stderr || run.stdout || "").trim().slice(-800)}`);
-        }
+        if (run.status !== 0) throw new Error(`shopify app execute failed (${name}, exit ${run.status}):\n${cliOutput()}`);
+        if (!existsSync(o)) throw new Error(`shopify app execute wrote no result for ${name}. It said:\n${cliOutput()}`);
         const raw = readFileSync(o, "utf8");
         let parsed: unknown;
         try {

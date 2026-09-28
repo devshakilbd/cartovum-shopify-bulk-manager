@@ -3,7 +3,9 @@
 export const PREFLIGHT = `#graphql
   query CartovumSeedPreflight($all: String!, $seeded: String!, $collections: String!) {
     shop { myshopifyDomain }
-    locations(first: 5) { nodes { id name isActive } }
+    # Only the id: with write_inventory a location's id is readable, but name and isActive need read_locations,
+    # which the app does not request. locations() returns active locations only by default.
+    locations(first: 5) { nodes { id } }
     all: productsCount(query: $all, limit: null) { count precision }
     seeded: productsCount(query: $seeded, limit: null) { count precision }
     existing: products(first: 100, query: $seeded) { nodes { id handle tags } }

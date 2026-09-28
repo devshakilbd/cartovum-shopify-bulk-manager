@@ -31,7 +31,7 @@ const SEEDED_QUERY = `tag:${SEED_TAG} AND ${ANY_STATUS_QUERY}`;
 
 type Preflight = {
   shop: { myshopifyDomain: string };
-  locations: { nodes: { id: string; name: string; isActive: boolean }[] };
+  locations: { nodes: { id: string }[] };
   all: { count: number; precision: string };
   seeded: { count: number; precision: string };
   existing: { nodes: { id: string; handle: string; tags: string[] }[] };
@@ -74,7 +74,7 @@ async function preflight(admin: CliAdmin) {
   const problems: string[] = [];
 
   if (data.shop.myshopifyDomain !== STORE) problems.push(`Connected to ${data.shop.myshopifyDomain}, not ${STORE}.`);
-  const active = data.locations.nodes.filter((l) => l.isActive);
+  const active = data.locations.nodes;
   if (active.length !== 1) problems.push(`Expected exactly 1 active location (the stock tests assume one); found ${active.length}.`);
   const others = data.all.count - data.seeded.count;
   if (data.all.precision !== "EXACT" || data.seeded.precision !== "EXACT") problems.push("Shopify could not give exact product counts.");
@@ -90,7 +90,7 @@ async function preflight(admin: CliAdmin) {
   }
 
   out(`Store: ${data.shop.myshopifyDomain}`);
-  out(`Location: ${active.map((l) => `${l.name} (${l.id})`).join(", ") || "none"}`);
+  out(`Active location: ${active.map((l) => l.id).join(", ") || "none"}`);
   out(`Products: ${data.all.count} in total, ${data.seeded.count} seeded`);
   out(`Definitions already present: ${DEFINITIONS.filter((d) => data.metafieldDefinitions.nodes.some((n) => n.key === d.key)).map((d) => d.key).join(", ") || "none"}`);
   out(`Collections already present: ${data.collections.nodes.map((c) => c.handle).join(", ") || "none"}`);

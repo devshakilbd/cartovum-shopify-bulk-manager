@@ -20,14 +20,25 @@ Shopify: "Any scope that writes a resource also grants read access to it, so req
 | `products`, `nodes`, `productsCount` (Product fields) | Product: "Requires `read_products` access scope." | `write_products` |
 | `collections` | Collection: "Requires `read_products` access scope." | `write_products` |
 | `productTypes`, `productTags` | Product data | `write_products` |
-| `metafieldDefinitions(ownerType: PRODUCT)` | No scope printed on the reference page; metafield access follows the owner resource | `write_products` (to be confirmed on a development store in Stage 2) |
+| `metafieldDefinitions(ownerType: PRODUCT)` | No scope printed on the reference page; metafield access follows the owner resource | `write_products` — **verified live** on cartovum-bulk-dev (2026-09-28, seed preflight) |
 | `metafieldsSet` | "Requires the same access level needed to mutate the owner resource" | `write_products` |
 | `metafieldsDelete` | "setting a metafield on a `PRODUCT` requires the same access as mutating a `PRODUCT`" | `write_products` |
 | `productVariantsBulkUpdate` | "Requires `write_products`" | `write_products` |
 | Variant `inventoryItem { tracked }` | InventoryItem: "Requires `read_inventory` access scope or `read_products` access scope." | either |
 | `inventoryLevels`, `quantities` | InventoryLevel: "Requires `read_inventory` access scope." | `write_inventory` |
-| `location { id }` on an inventory level | Location: "Requires `read_locations` access scope, `read_inventory` access scope or `read_markets_home` access scope." | `write_inventory` |
+| `location { id }` on an inventory level | Location: "Requires `read_locations` access scope, `read_inventory` access scope or `read_markets_home` access scope." | `write_inventory` — **verified live** on cartovum-bulk-dev (2026-09-28): `id` is readable |
 | `inventoryItemUpdate` | "Requires `write_inventory` access scope." | `write_inventory` |
+
+## Field-level exception found live
+
+On 2026-09-28, against cartovum-bulk-dev with only `write_products,write_inventory`, Shopify returned a location's `id` but refused two other Location fields:
+
+| Field | Shopify's `requiredAccess` |
+|---|---|
+| `Location.isActive` | `read_locations` |
+| `Location.name` | `read_locations` or `read_markets_home` |
+
+The app reads only `location { id }`, so it is unaffected, and `read_locations` is not requested. The development-store seed reads only the id as well. Any future feature that needs a location's name must add `read_locations` and update this file.
 
 ## Staff permissions
 
