@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { ANY_STATUS_QUERY } from "./core/filters";
 import type { Gateway } from "./core/gateway";
 import { GatewayError } from "./core/gateway";
 import type { AttributeValue, GlobalAttributeDefinition, ProductState, ShopSettings } from "./core/types";
@@ -60,8 +61,8 @@ const DEFINITIONS = `#graphql
   }`;
 
 const LOCAL_SCAN = `#graphql
-  query CartovumLocalScan($after: String, $namespace: String!) {
-    products(first: 100, after: $after, sortKey: ID) {
+  query CartovumLocalScan($after: String, $namespace: String!, $query: String!) {
+    products(first: 100, after: $after, query: $query, sortKey: ID) {
       nodes { metafields(first: 50, namespace: $namespace) { nodes { key type value } } }
       pageInfo { hasNextPage endCursor }
     }
@@ -248,7 +249,8 @@ export class ShopifyGateway implements Gateway {
       let after: string | null = null;
       let scanned = 0;
       do {
-        const data = await this.read(LOCAL_SCAN, { after, namespace });
+        // Every status, so values used only on draft, archived or unlisted products are offered too.
+        const data = await this.read(LOCAL_SCAN, { after, namespace, query: ANY_STATUS_QUERY });
         for (const p of data.products.nodes as Json[])
           for (const m of p.metafields.nodes as Json[]) {
             if (!TEXT_TYPES.includes(m.type)) continue;

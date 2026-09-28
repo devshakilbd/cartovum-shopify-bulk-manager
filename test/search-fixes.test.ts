@@ -1,0 +1,150 @@
+import { describe, expect, it } from "vitest";
+import { createDryRun, createOperation, runToEnd } from "../app/lib/core/engine";
+import { ANY_STATUS_QUERY, matches, matchesName, parseFilters, searchPage, shopifyQuery, words } from "../app/lib/core/filters";
+import { makeProduct, MemoryGateway } from "../app/lib/core/memory-gateway";
+import { MemoryStore } from "../app/lib/core/memory-store";
+import { DEFAULT_SETTINGS, type AttributeValue, type ProductState } from "../app/lib/core/types";
+
+/**
+ * Audit fixes #1 and #2. The in-memory Shopify follows the documented search rules: only Active products
+ * when no status is named, and title words matched by trailing wildcard only.
+ */
+
+const SHOP = "a.myshopify.com";
+const red: AttributeValue[] = [{ key: "shared.colour", kind: "global", type: "list.single_line_text_field", values: ["Red"] }];
+
+async function allPages(gw: MemoryGateway, raw: Record<string, unknown>) {
+  const f = parseFilters({ perPage: 25, ...raw });
+  const seen: ProductState[] = [];
+  let cursor: string | null = null;
+  do {
+    const page = await searchPage(gw, f, cursor);
+    seen.push(...page.items);
+    cursor = page.next;
+  } while (cursor);
+  return seen.map((p) => p.title);
+}
+
+function store() {
+  const gw = new MemoryGateway([], [{ key: "shared.colour", label: "Colour", type: "list.single_line_text_field", choices: ["Red", "Crimson"] }]);
+  const add = (p: ProductState) => gw.products.set(p.id, p);
+  add(makeProduct({ title: "CBM Test F1", status: "ACTIVE", attributes: red }));
+  add(makeProduct({ title: "CBM Test F2", status: "DRAFT", attributes: red }));
+  add(makeProduct({ title: "CBM Test F3", status: "ARCHIVED" }));
+  add(makeProduct({ title: "CBM Test X1", status: "UNLISTED", attributes: red }));
+  for (let i = 1; i <= 12; i++) add(makeProduct({ title: `CBM Test B${String(i).padStart(2, "0")}`, attributes: red }));
+  add(makeProduct({ title: "Alloy Wheel 18\" Black", status: "DRAFT" }));
+  return gw;
+}
+
+describe("#1 any status means every status", () => {
+  it("the search string names every status when none is chosen, and only the chosen one otherwise", () => {
+    expect(ANY_STATUS_QUERY).toBe("(status:active OR status:draft OR status:archived OR status:unlisted)");
+    expect(shopifyQuery(parseFilters({}))).toBe(ANY_STATUS_QUERY);
+    expect(shopifyQuery(parseFilters({ status: "DRAFT" }))).toBe("status:draft");
+  });
+
+  it("the test double really does return only Active products for an empty query", async () => {
+    const gw = store();
+    const page = await gw.searchProducts("", 250, null);
+    expect(page.products.every((p) => p.status === "ACTIVE")).toBe(true);
+    expect(page.products).toHaveLength(13);
+  });
+
+  it("finds Draft, Archived and Unlisted products when status is Any", async () => {
+    const titles = await allPages(store(), { search: "CBM Test" });
+    expect(titles).toEqual(expect.arrayContaining(["CBM Test F2", "CBM Test F3", "CBM Test X1"]));
+    expect(titles).toHaveLength(16);
+  });
+
+  it("a status filter still limits to that status", async () => {
+    expect(await allPages(store(), { status: "DRAFT" })).toEqual(["CBM Test F2", 'Alloy Wheel 18" Black']);
+    expect(await allPages(store(), { status: "UNLISTED" })).toEqual(["CBM Test X1"]);
+  });
+
+  it("select all matching includes every status (Colour = Red: Active, Draft and Unlisted)", async () => {
+    const gw = store();
+    const s = new MemoryStore();
+    const op = await createOperation(s, gw, SHOP, {
+      type: "attributes",
+      params: { op: "set_terms", attribute: "shared.colour", terms: ["Crimson"] },
+      selection: { mode: "ALL_MATCHING", filters: { conditions: [{ attribute: "shared.colour", value: "Red" }] } },
+      userLabel: "t",
+    });
+    await runToEnd(s, gw, SHOP, op.id);
+    // F1, F2 (Draft), X1 (Unlisted) and B01–B12.
+    expect(await s.getOperation(SHOP, op.id)).toMatchObject({ total: 15, changed: 15 });
+  });
+
+  it("the conversion dry run sees Draft products, so staged Draft-only conversion is testable", async () => {
+    const gw = new MemoryGateway([], [{ key: "shared.rim_size", label: "Rim Size", type: "list.single_line_text_field", choices: ['18"', '19"'] }]);
+    const local = (v: string): AttributeValue[] => [{ key: "cartovum_local.rim_size", kind: "local", type: "single_line_text_field", values: [v] }];
+    const c1 = makeProduct({ status: "ACTIVE", attributes: local("18") });
+    const c10 = makeProduct({ status: "DRAFT", attributes: local("19") });
+    gw.products.set(c1.id, c1);
+    gw.products.set(c10.id, c10);
+    const s = new MemoryStore();
+    await s.saveSettings(SHOP, { ...DEFAULT_SETTINGS, convertWritesEnabled: true, convertAllowedStatuses: ["DRAFT"] });
+    const dry = await createDryRun(s, SHOP, "t");
+    await runToEnd(s, gw, SHOP, dry.id);
+    expect((await s.dryRunItems(SHOP)).items.map((i) => i.productId)).toEqual([c1.id, c10.id]);
+
+    const op = await createOperation(s, gw, SHOP, { type: "convert", params: {}, selection: { mode: "IDS", ids: [c1.id, c10.id] }, userLabel: "t" });
+    await runToEnd(s, gw, SHOP, op.id);
+    expect((await s.results(SHOP, op.id)).map((t) => t.result!.status)).toEqual(["skipped", "changed"]);
+  });
+});
+
+describe("#2 name search uses documented syntax only", () => {
+  it("sends one trailing-wildcard title clause per word, never a leading wildcard", () => {
+    const q = shopifyQuery(parseFilters({ search: "CBM Test B" }));
+    expect(q).toBe(`title:cbm* AND title:test* AND title:b* AND ${ANY_STATUS_QUERY}`);
+    expect(q).not.toMatch(/title:\*/);
+  });
+
+  it("drops every character with a meaning in Shopify's syntax", () => {
+    expect(words('Wheel" OR status:draft (x) *-y \\z')).toEqual(["wheel", "or", "status", "draft", "x", "y", "z"]);
+    const q = shopifyQuery(parseFilters({ search: '18" (alloy)' }));
+    expect(q.startsWith("title:18* AND title:alloy* AND ")).toBe(true);
+  });
+
+  it("keeps letters with accents and non-Latin scripts", () => {
+    expect(words("Café Jantes শাকিল")).toEqual(["café", "jantes", "শাকিল"]);
+  });
+
+  it("finds 'CBM Test B' → B01–B12 (the old leading-wildcard query found nothing)", async () => {
+    const gw = store();
+    const titles = await allPages(gw, { search: "CBM Test B" });
+    expect(titles).toHaveLength(12);
+    expect(titles.every((t) => t.startsWith("CBM Test B"))).toBe(true);
+    const old = await gw.searchProducts('title:*CBM Test B* AND ' + ANY_STATUS_QUERY, 250, null);
+    expect(old.products).toHaveLength(0);
+  });
+
+  it("matches the start of words in any order, ignoring case and punctuation", () => {
+    expect(matchesName('Alloy Wheel 18" Black', "whe")).toBe(true);
+    expect(matchesName('Alloy Wheel 18" Black', "black 18")).toBe(true);
+    expect(matchesName('Alloy Wheel 18" Black', "WHEEL alloy")).toBe(true);
+    expect(matchesName('Alloy Wheel 18" Black', "heel")).toBe(false); // middle of a word
+    expect(matchesName('Alloy Wheel 18" Black', "wheel red")).toBe(false); // every word must match
+    expect(matchesName("anything", '"*()')).toBe(true); // no words: no name constraint
+  });
+
+  it("the app's check and Shopify's narrowing agree, so pages, counts and select-all match", async () => {
+    const gw = store();
+    for (const search of ["CBM", "test b0", "b1", "wheel 18", "black", "heel", "x1 test"]) {
+      const f = parseFilters({ search });
+      const byShopify = (await gw.searchProducts(shopifyQuery(f), 250, null)).products.map((p) => p.title).sort();
+      const byApp = [...gw.products.values()].filter((p) => matches(p, f)).map((p) => p.title).sort();
+      expect(byShopify, search).toEqual(byApp);
+    }
+  });
+
+  it("finds all 16 'CBM Test' products, of every status, on one page of 25", async () => {
+    const gw = store();
+    const f = parseFilters({ search: "CBM Test", perPage: 25 });
+    const first = await searchPage(gw, f, null);
+    expect(first.items).toHaveLength(16);
+    expect(first.next).toBeNull();
+  });
+});

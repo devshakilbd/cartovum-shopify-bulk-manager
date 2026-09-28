@@ -213,7 +213,8 @@ function context(store: Store, gw: Gateway, settings: Ctx["settings"], shop: str
 /** Scan one page of the catalogue and add the products that match (select all matching / dry run). */
 async function resolveStep(store: Store, gw: Gateway, op: Operation, ctx: Ctx): Promise<void> {
   const filters = op.filters ? normaliseFilters(op.filters as Partial<Filters>) : null;
-  const query = filters ? shopifyQuery(filters) : "";
+  // The dry run has no filters, but still names every status: an empty query would scan Active products only.
+  const query = shopifyQuery(filters ?? normaliseFilters({}));
   const page = await gw.searchProducts(query, RESOLVE_PAGE, op.resolveCursor);
 
   if (op.type === "dryrun") {

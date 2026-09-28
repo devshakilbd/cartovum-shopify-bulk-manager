@@ -10,11 +10,11 @@ The 42 features of Cartovum Bulk Product Manager v1.3.9 (WooCommerce), and where
 
 | # | Feature | Current implementation | Shopify equivalent | API resource | Scope | Status |
 |---|---|---|---|---|---|---|
-| 1 | Product search | `filters.ts` `shopifyQuery` + `matches` | Product title | `products(query: "title:*…*")` | write_products | Implemented |
+| 1 | Product search | `filters.ts` `shopifyQuery` + `matchesName` | Product title, word prefixes | `products(query: "title:word* …")` | write_products | **Partial**: every word must start a title word; mid-word text is not found |
 | 2 | SKU search | same | Variant SKU, any variant | `products(query: "sku:…")` | write_products | Implemented |
 | 3 | Category / product-type filtering | collection, **product type**, **tags** | Collection, `productType`, `tags` | `collection_id:`, `product_type:`, `tag:`; `collections`, `productTypes`, `productTags` for suggestions | write_products | Implemented (type and tags added in Stage 1) |
 | 4 | Stock status filtering | derived from variant inventory | InventoryItem.tracked + variant inventoryPolicy + InventoryLevel available | `inventoryItem`, `inventoryLevels` | write_products, write_inventory | Implemented |
-| 5 | Product status filtering | ACTIVE / DRAFT / ARCHIVED / UNLISTED | Product.status | `status:` | write_products | Implemented |
+| 5 | Product status filtering | ACTIVE / DRAFT / ARCHIVED / UNLISTED; Any = all four | Product.status | `status:` (every status named when Any) | write_products | Implemented |
 | 6 | Multiple attribute conditions | up to 10, AND | — | — | — | Implemented |
 | 7 | Global/shared attribute filtering | metafield definitions with a choices list | MetafieldDefinition + choices | `metafieldDefinitions`, `metafields` | write_products | **Partial**: Shopify standard category attributes (metaobject references, e.g. `shopify.color-pattern`) are not handled — Stage 4, decision pending |
 | 8 | Local/custom attribute filtering | text metafields in local namespaces | Product metafields | `metafields` | write_products | Implemented |

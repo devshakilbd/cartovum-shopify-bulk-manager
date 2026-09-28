@@ -9,7 +9,10 @@ import { MAX_CONDITIONS, MAX_SKUS, MAX_TAGS, PRODUCT_STATUSES, STOCK_STATUSES } 
  *
  * Semantics kept from v1.3.9:
  * - name search, SKU list (one per line or comma separated, up to 500), category (collection),
- *   stock status, product status;
+ *   stock status, product status ("any" means every status, not Shopify's Active-only default);
+ * - name search is word based, as Shopify's search is: every word typed must start a word of the title
+ *   ("whe" finds "Alloy Wheel"; "heel" does not). The same rule is applied by Shopify and by matches(),
+ *   so a page, a count and "select all matching" always agree;
  * - added for Shopify: product type (exact, ignoring case) and tags (the product must carry every one);
  * - up to 10 attribute conditions, combined with AND: a product must match every one;
  * - a condition with no value means "has this attribute"; a value is compared case-insensitively.
@@ -68,18 +71,33 @@ export function quote(value: string): string {
 }
 
 /**
- * The server-side narrowing query sent to Shopify. It may match more than the filters do (search is
- * fuzzy, stock is derived); matches() below is the exact, final test, as v1.3.9 confirmed LIKE matches
- * in PHP.
+ * Words of a title or a name search: runs of letters (with their accents) and digits, lower-cased.
+ * Everything else, including every character with a meaning in Shopify's search syntax, separates words.
+ */
+export function words(text: string): string[] {
+  return (text.toLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu) ?? []).slice(0, 20);
+}
+
+/**
+ * Shopify's products query returns only Active products unless a status is given ("Default: active" in
+ * the API reference), so "any status" has to name every status explicitly.
+ */
+export const ANY_STATUS_QUERY = "(" + PRODUCT_STATUSES.map((s) => `status:${s.toLowerCase()}`).join(" OR ") + ")";
+
+/**
+ * The server-side narrowing query sent to Shopify. It may match more than the filters do (stock is
+ * derived, conditions are not sent); matches() below is the exact, final test, as v1.3.9 confirmed LIKE
+ * matches in PHP. It must never match less, so only clauses Shopify documents are used: exact fields,
+ * and trailing wildcards (Shopify supports "norm*" but documents no leading wildcard).
  */
 export function shopifyQuery(f: Filters): string {
   const parts: string[] = [];
-  if (f.search) parts.push(`title:*${f.search.replace(/[\\"():*]/g, " ").trim()}*`);
+  for (const w of words(f.search)) parts.push(`title:${w}*`);
   if (f.skus.length) parts.push("(" + f.skus.map((s) => `sku:${quote(s)}`).join(" OR ") + ")");
   if (f.collectionId) parts.push(`collection_id:${f.collectionId.split("/").pop()}`);
   if (f.productType) parts.push(`product_type:${quote(f.productType)}`);
   for (const tag of f.tags) parts.push(`tag:${quote(tag)}`);
-  if (f.status) parts.push(`status:${f.status.toLowerCase()}`);
+  parts.push(f.status ? `status:${f.status.toLowerCase()}` : ANY_STATUS_QUERY);
   // Attribute conditions are not sent: metafield search only works for definitions with admin filtering
   // switched on, and would silently match nothing otherwise. They are applied exactly by matches().
   return parts.join(" AND ");
@@ -102,8 +120,14 @@ export function matchesCondition(p: ProductState, c: AttributeCondition): boolea
   return !!attribute && attribute.values.length > 0 && (!c.value || attribute.values.some((v) => eq(v, c.value)));
 }
 
+/** Every word searched for starts some word of the title. A search with no words constrains nothing. */
+export function matchesName(title: string, search: string): boolean {
+  const titleWords = words(title);
+  return words(search).every((w) => titleWords.some((t) => t.startsWith(w)));
+}
+
 export function matches(p: ProductState, f: Filters): boolean {
-  if (f.search && !p.title.toLowerCase().includes(f.search.toLowerCase())) return false;
+  if (f.search && !matchesName(p.title, f.search)) return false;
   if (f.skus.length && !p.variants.some((v) => f.skus.some((s) => v.sku === s))) return false;
   if (f.collectionId && !p.collectionIds.includes(f.collectionId)) return false;
   if (f.productType && !eq(p.productType, f.productType)) return false;

@@ -31,12 +31,33 @@ export class MemoryGateway implements Gateway {
 
   async searchProducts(query: string, first: number, after: string | null) {
     await this.enter("searchProducts", [query, first, after]);
-    const all = [...this.products.values()].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+    const all = [...this.products.values()].filter((p) => this.shopifyWouldReturn(p, query)).sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
     const start = after ? Number(after) : 0;
     const products = all.slice(start, start + first).map((p) => structuredClone(p));
     const next = start + first;
     return { products, endCursor: next < all.length ? String(next) : null, hasNextPage: next < all.length };
   }
+  /**
+   * The parts of Shopify's product search the app relies on, as documented:
+   * - with no status clause only ACTIVE products are returned ("Default: active");
+   * - `title:word*` matches titles with a word starting with "word" (trailing wildcard);
+   * - a leading wildcard is not documented, so `title:*…` is treated as matching nothing.
+   * Other clauses are ignored, which returns more, never fewer, products: the app confirms every match.
+   */
+  private shopifyWouldReturn(p: ProductState, raw: string): boolean {
+    // Quoted values are literal text in Shopify's syntax, so clauses are only looked for outside them.
+    const query = raw.replace(/"(?:\\.|[^"\\])*"/g, '""');
+    const statuses = [...query.matchAll(/status:([a-z]+)/g)].map((m) => m[1].toUpperCase());
+    if (!(statuses.length ? statuses : ["ACTIVE"]).includes(p.status)) return false;
+    const titleWords = p.title.toLowerCase().split(/[^\p{L}\p{M}\p{N}]+/u);
+    for (const m of query.matchAll(/title:(\S+)/g)) {
+      if (m[1].startsWith("*")) return false;
+      const prefix = m[1].replace(/\*$/, "");
+      if (!titleWords.some((w) => (m[1].endsWith("*") ? w.startsWith(prefix) : w === prefix))) return false;
+    }
+    return true;
+  }
+
   async getProducts(ids: string[]) {
     await this.enter("getProducts", [ids]);
     return ids.map((id) => this.products.get(id)).filter((p): p is ProductState => !!p).map((p) => structuredClone(p));

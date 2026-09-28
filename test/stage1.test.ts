@@ -18,7 +18,8 @@ describe("product type and tag filters", () => {
   it("sends both to Shopify escaped, and does not treat them as an exact count", () => {
     const f = parseFilters({ productType: 'Wheel" OR status:draft', tags: "a\\b" });
     // One backslash in the tag becomes two in the search string; the quote is escaped too.
-    expect(shopifyQuery(f)).toBe('product_type:"Wheel\\" OR status:draft" AND tag:"a\\\\b"');
+    // With no status chosen, every status is named (Shopify's default is Active only).
+    expect(shopifyQuery(f)).toBe('product_type:"Wheel\\" OR status:draft" AND tag:"a\\\\b" AND (status:active OR status:draft OR status:archived OR status:unlisted)');
     expect(queryIsExact(f)).toBe(false);
     expect(queryIsExact(parseFilters({ status: "DRAFT" }))).toBe(true);
   });

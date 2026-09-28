@@ -25,11 +25,11 @@ Source audited: `cartovum-bulk-product-manager/` v1.3.9 — every file was read:
 
 | # | Existing feature | WordPress implementation | Shopify equivalent | Implementation | Exact? | Notes |
 |---|---|---|---|---|---|---|
-| 1 | Search by product name | `WP_Query s` | Product search `title:*…*`, then exact case-insensitive "contains" | `filters.ts` `shopifyQuery` + `matches` | Mapped | WP `s` also searched content; the screen labelled it "Search name", which is what is kept. |
+| 1 | Search by product name | `WP_Query s` (each word matched anywhere in title or content) | Each word typed must **start** a word of the title (`title:word*` per word, confirmed by the app with the same rule) | `filters.ts` `words`, `shopifyQuery`, `matchesName` | Partial | Shopify documents only trailing wildcards, so text in the middle of a word ("heel" in "Wheel") is not found. Content is not searched; the screen was labelled "Search name". |
 | 2 | SKU list filter (lines or commas, ≤500) | `_sku IN (…)` | `sku:"…" OR …`, confirmed on every variant | `parseFilters`, `matches` | Yes | Variant-level, so a multi-variant product matches on any variant's SKU. |
 | 3 | Category filter | `product_cat` tax query incl. children | `collection_id:`, plus product type (`product_type:`) and tags (`tag:`, all required) | `shopifyQuery`, `matches` | Mapped | Collections are flat, so "include children" has no counterpart. Product type and tag filters added in Stage 1. |
 | 4 | Stock status filter | `_stock_status` meta | Derived per variant (tracked/policy/available); multi-variant derived like a variable parent | `productStockStatus` | Mapped | Confirmed by the app, not Shopify, so pages are assembled server-side. |
-| 5 | Published-state filter | `post_status` | `status:` ACTIVE/DRAFT/ARCHIVED/UNLISTED | `parseFilters` | Mapped | Shopify's four statuses replace WP's four. |
+| 5 | Published-state filter | `post_status` | `status:` ACTIVE/DRAFT/ARCHIVED/UNLISTED; "Any" names all four | `parseFilters`, `ANY_STATUS_QUERY` | Mapped | Shopify's four statuses replace WP's four. Shopify returns only Active products when no status is given, so "Any" (and select all, and the conversion dry run) sends every status explicitly. |
 | 6 | Attribute conditions, up to 10, AND | tax query `AND` + local-ID intersection | Same semantics: every condition must hold; empty value = "has the attribute"; value compare case-insensitive | `parseConditions`, `matchesCondition` | Yes | Adds product options as a condition type (read-only). |
 | 7 | Legacy single-attribute request fields | `attribute`/`attr_term`/`attr_value` fallback | — | — | N/A | Only existed for older copies of the plugin's own JS; no such clients exist here. |
 | 8 | Per page 25/50/100/200 | `per_page` | Same | `parseFilters` | Yes | |
@@ -97,4 +97,4 @@ Source audited: `cartovum-bulk-product-manager/` v1.3.9 — every file was read:
 | 70 | View details: version, features, compatibility, readme | dialog | Dashboard "What this app does", version and API version | Dashboard | Partial | No WordPress/PHP compatibility table (not meaningful); guide is README.md. |
 | 71 | Translatable strings | text domain | English strings | — | Partial | The plugin shipped no translations; i18n can be added without behaviour change. |
 
-Totals: 71 rows — 62 implemented (Yes/Mapped), 5 partial, 4 not applicable, 0 blocked. See [FEATURE_PARITY_REPORT.md](FEATURE_PARITY_REPORT.md) for test evidence.
+Totals: 71 rows — 61 implemented (Yes/Mapped), 6 partial, 4 not applicable, 0 blocked. See [FEATURE_PARITY_REPORT.md](FEATURE_PARITY_REPORT.md) for test evidence.

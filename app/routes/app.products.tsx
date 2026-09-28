@@ -207,7 +207,7 @@ export default function Products() {
           }}
         >
           <div style={grid}>
-            <Field label="Search name">{(id) => <input id={id} type="search" style={control} value={form.search} onChange={(e) => setForm({ ...form, search: e.target.value })} placeholder="Product name" />}</Field>
+            <Field label="Search name" hint="Each word must start a word of the title: “whe 18” finds “Alloy Wheel 18”.">{(id) => <input id={id} type="search" style={control} value={form.search} onChange={(e) => setForm({ ...form, search: e.target.value })} placeholder="Product name" />}</Field>
             <Field label="Collection">
               {(id) => (
                 <select id={id} style={control} value={form.collectionId} onChange={(e) => setForm({ ...form, collectionId: e.target.value })}>

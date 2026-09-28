@@ -4,11 +4,11 @@ Row numbers refer to [SHOPIFY_FEATURE_PARITY.md](SHOPIFY_FEATURE_PARITY.md). "Li
 
 | # | Feature | Original behaviour | Shopify behaviour | Status | Test | Notes |
 |---|---|---|---|---|---|---|
-| 1 | Name search | WP search | Title contains, confirmed exactly | PASS | core: filters | |
+| 1 | Name search | WP search, any part of a word | Each word must start a title word | PARTIAL | search-fixes: #2 | Mid-word text is not found: Shopify documents no leading wildcard. |
 | 2 | SKU list | `_sku IN` | Any variant SKU, ≤500 | PASS | core: filters, paging | |
 | 3 | Category filter | incl. children | Collection, product type, tags | PASS | core: filters; stage1: type/tag | Collections have no children. |
 | 4 | Stock status filter | meta | Derived | PASS | core: paging, fingerprint | |
-| 5 | Published state | 4 WP statuses | 4 Shopify statuses | PASS | core: filters | |
+| 5 | Published state | 4 WP statuses | 4 Shopify statuses; Any = all four | PASS | search-fixes: #1 | |
 | 6 | Attribute conditions (AND, ≤10) | tax/local | Same | PASS | core: filters | |
 | 7 | Legacy request fields | fallback | — | NOT APPLICABLE | — | Only served older copies of the plugin's own script. |
 | 8 | Per page | 25–200 | Same | PASS | core: filters | |
@@ -42,4 +42,4 @@ Row numbers refer to [SHOPIFY_FEATURE_PARITY.md](SHOPIFY_FEATURE_PARITY.md). "Li
 | 70 | View details | dialog | Dashboard section | PARTIAL | — | No WP/PHP compatibility table. |
 | 71 | Translations | text domain | English | PARTIAL | — | Plugin shipped none. |
 
-**Totals (71 rows):** PASS 62 · PARTIAL 5 · BLOCKED 0 · NOT APPLICABLE 4.
+**Totals (71 rows):** PASS 61 · PARTIAL 6 · BLOCKED 0 · NOT APPLICABLE 4.
