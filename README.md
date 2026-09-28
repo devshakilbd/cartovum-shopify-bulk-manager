@@ -7,9 +7,9 @@ The Shopify version of the Cartovum Bulk Product Manager v1.3.9 WooCommerce plug
 - Scopes: `write_products, write_inventory` ([ACCESS_SCOPES.md](ACCESS_SCOPES.md))
 - Prisma: SQLite in development, PostgreSQL in production
 
-Documentation: [Migration map](MIGRATION_MAP.md) · [Access scopes](ACCESS_SCOPES.md) · [Architecture](ARCHITECTURE.md) · [Data mapping](SHOPIFY_DATA_MAPPING.md) · [Parity matrix](SHOPIFY_FEATURE_PARITY.md) · [Parity report](FEATURE_PARITY_REPORT.md) · [Security](SECURITY.md) · [Privacy](PRIVACY_DATA_MODEL.md) · [App Store readiness](APP_STORE_READINESS.md) · [Testing](TESTING.md)
+Documentation: [Functional test report](FUNCTIONAL_TEST_REPORT.md) · [Deployment](DEPLOYMENT.md) · [Performance](PERFORMANCE.md) · [App Store listing](APP_STORE_LISTING.md) · [Migration map](MIGRATION_MAP.md) · [Access scopes](ACCESS_SCOPES.md) · [Architecture](ARCHITECTURE.md) · [Data mapping](SHOPIFY_DATA_MAPPING.md) · [Parity matrix](SHOPIFY_FEATURE_PARITY.md) · [Parity report](FEATURE_PARITY_REPORT.md) · [Security](SECURITY.md) · [Privacy](PRIVACY_DATA_MODEL.md) · [App Store readiness](APP_STORE_READINESS.md) · [Testing](TESTING.md)
 
-> **Status:** every feature is covered by automated tests against an in-memory Shopify. The app has **not yet been installed on a real store**; that is Stage 2 in [MIGRATION_MAP.md](MIGRATION_MAP.md).
+> **Status:** installed on the development store and functionally tested there (see [FUNCTIONAL_TEST_REPORT.md](FUNCTIONAL_TEST_REPORT.md)). **Not deployed to production yet** — see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Requirements
 

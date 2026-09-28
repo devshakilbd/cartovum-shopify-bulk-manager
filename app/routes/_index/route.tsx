@@ -1,57 +1,29 @@
-import type { LoaderFunctionArgs } from "react-router";
-import { redirect, Form, useLoaderData } from "react-router";
+import type { LoaderFunctionArgs, MetaFunction } from "react-router";
+import { redirect } from "react-router";
+import { APP_NAME, PublicPage } from "../../components/public-page";
 
-import { login } from "../../shopify.server";
+export const meta: MetaFunction = () => [{ title: APP_NAME }, { name: "description", content: "Bulk-edit Shopify stock status and product attributes safely: batches of 10, every product checked afterwards, and every run can be put back." }];
 
-import styles from "./styles.module.css";
-
+/** Shopify opens the app with ?shop=…; send that into the embedded app. Everyone else sees the public page. */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
-
-  if (url.searchParams.get("shop")) {
-    throw redirect(`/app?${url.searchParams.toString()}`);
-  }
-
-  return { showForm: Boolean(login) };
+  if (url.searchParams.get("shop")) throw redirect(`/app?${url.searchParams.toString()}`);
+  return null;
 };
 
-export default function App() {
-  const { showForm } = useLoaderData<typeof loader>();
-
+export default function Landing() {
   return (
-    <div className={styles.index}>
-      <div className={styles.content}>
-        <h1 className={styles.heading}>A short heading about [your app]</h1>
-        <p className={styles.text}>
-          A tagline about [your app] that describes your value proposition.
-        </p>
-        {showForm && (
-          <Form className={styles.form} method="post" action="/auth/login">
-            <label className={styles.label}>
-              <span>Shop domain</span>
-              <input className={styles.input} type="text" name="shop" />
-              <span>e.g: my-shop-domain.myshopify.com</span>
-            </label>
-            <button className={styles.button} type="submit">
-              Log in
-            </button>
-          </Form>
-        )}
-        <ul className={styles.list}>
-          <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
-          </li>
-          <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
-          </li>
-          <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
-          </li>
-        </ul>
-      </div>
-    </div>
+    <PublicPage title={APP_NAME}>
+      <p>Find products, filter and select them, then change their stock status or one attribute across all of them — safely.</p>
+      <ul>
+        <li>Search by name, SKU, collection, product type, tags, status, stock status and several attribute conditions at once.</li>
+        <li>Select page by page, or every matching product in one click.</li>
+        <li>Set stock status; add, remove or replace attribute values; remove an attribute; set a typed value.</li>
+        <li>Convert free-text attributes to shared attributes, with a dry run, approved mappings and held values.</li>
+        <li>Changes run in batches of 10. Every product is read back and checked; anything else that changed is reported.</li>
+        <li>Every run can be put back. A product changed since the run is left alone, never overwritten.</li>
+      </ul>
+      <p>Install it from the Shopify App Store. Once installed, open it from your Shopify admin under Apps.</p>
+    </PublicPage>
   );
 }

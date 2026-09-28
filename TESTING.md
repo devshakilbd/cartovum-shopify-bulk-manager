@@ -1,7 +1,7 @@
 # Testing
 
 ```bash
-npm test                  # 93 automated tests (vitest)
+npm test                  # 100 automated tests (vitest)
 npm run typecheck
 npm run lint
 npm run graphql-codegen && npm run validate:graphql   # checks every GraphQL document against the 2026-07 schema
@@ -43,9 +43,13 @@ What it creates: definitions `shared.colour`, `shared.rim_size`, `shared.centre_
 
 Preflight refuses to continue if the store holds any product without the `cbm-seed` tag (K1 included — create K1 after seeding), more than one active location, or a `shared.*` definition with different choices.
 
+## Functional tests on the development store
+
+`npm run test:functional -- <suite> --confirm cartovum-bulk-dev` with the app running (`shopify app dev --store cartovum-bulk-dev`). Suites: `stock`, `attributes`, `batch`, `conversion`, `filters`, `k1`. Operations are created in the development database as the app's API creates them and run by the app's own worker; every product is read back independently, put back, and must match its before-state fingerprint exactly. The harness raises "runs kept" to 200 while it runs and restores the settings afterwards. Results: [FUNCTIONAL_TEST_REPORT.md](FUNCTIONAL_TEST_REPORT.md).
+
 ## Not yet run (external requirement)
 
-- **Live Shopify integration** against a development store — needs Partner credentials and a dev store (see APP_STORE_READINESS.md).
+- **K1 standard-category test** — K1 must be created by hand in cartovum-bulk-dev first.
 - **Browser UI tests** of the embedded screens — they only render inside Shopify admin. The endpoint tests exercise the same requests the screens send.
 
 Manual checklist for the dev store: search by name/SKU/collection/status/stock; add two attribute conditions; select across pages; select all matching; preview; run each stock status on an untracked product; confirm a tracked product with stock is skipped; add/remove/replace a value; remove an attribute; set a local value; stop a run mid-way; put back; edit one product by hand and put back again (it must be skipped); dry run; CSV; approve a mapping; hold a value; convert; put the conversion back; uninstall and reinstall.
