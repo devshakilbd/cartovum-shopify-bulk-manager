@@ -89,14 +89,19 @@ export const ANY_STATUS_QUERY = "(" + PRODUCT_STATUSES.map((s) => `status:${s.to
  * derived, conditions are not sent); matches() below is the exact, final test, as v1.3.9 confirmed LIKE
  * matches in PHP. It must never match less, so only clauses Shopify documents are used: exact fields,
  * and trailing wildcards (Shopify supports "norm*" but documents no leading wildcard).
+ *
+ * Measured on cartovum-bulk-dev (API 2026-07): Shopify returns no products at all when `collection_id` is
+ * combined with a title, sku or tag clause, although each works alone and collection_id works with
+ * product_type and status. So with a collection, title, sku and tag are left to matches().
  */
 export function shopifyQuery(f: Filters): string {
   const parts: string[] = [];
-  for (const w of words(f.search)) parts.push(`title:${w}*`);
-  if (f.skus.length) parts.push("(" + f.skus.map((s) => `sku:${quote(s)}`).join(" OR ") + ")");
-  if (f.collectionId) parts.push(`collection_id:${f.collectionId.split("/").pop()}`);
+  const collection = !!f.collectionId;
+  if (!collection) for (const w of words(f.search)) parts.push(`title:${w}*`);
+  if (f.skus.length && !collection) parts.push("(" + f.skus.map((s) => `sku:${quote(s)}`).join(" OR ") + ")");
+  if (collection) parts.push(`collection_id:${f.collectionId.split("/").pop()}`);
   if (f.productType) parts.push(`product_type:${quote(f.productType)}`);
-  for (const tag of f.tags) parts.push(`tag:${quote(tag)}`);
+  if (!collection) for (const tag of f.tags) parts.push(`tag:${quote(tag)}`);
   parts.push(f.status ? `status:${f.status.toLowerCase()}` : ANY_STATUS_QUERY);
   // Attribute conditions are not sent: metafield search only works for definitions with admin filtering
   // switched on, and would silently match nothing otherwise. They are applied exactly by matches().
@@ -106,7 +111,8 @@ export function shopifyQuery(f: Filters): string {
 /** True when shopifyQuery() matches exactly what matches() does, so Shopify's own count is the total. */
 export function queryIsExact(f: Filters): boolean {
   // Product type and tag are sent to Shopify but confirmed here too, so they are not counted as exact.
-  return !f.search && !f.stockStatus && !f.productType && !f.tags.length && f.conditions.length === 0;
+  // With a collection the sku clause is not sent (see shopifyQuery), so Shopify's count would be too high.
+  return !f.search && !f.stockStatus && !f.productType && !f.tags.length && f.conditions.length === 0 && !(f.collectionId && f.skus.length);
 }
 
 const eq = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();

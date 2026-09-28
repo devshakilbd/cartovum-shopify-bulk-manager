@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createDryRun, createOperation, runToEnd } from "../app/lib/core/engine";
-import { ANY_STATUS_QUERY, matches, matchesName, parseFilters, searchPage, shopifyQuery, words } from "../app/lib/core/filters";
+import { ANY_STATUS_QUERY, matches, matchesName, parseFilters, queryIsExact, searchPage, shopifyQuery, words } from "../app/lib/core/filters";
 import { makeProduct, MemoryGateway } from "../app/lib/core/memory-gateway";
 import { MemoryStore } from "../app/lib/core/memory-store";
 import { DEFAULT_SETTINGS, type AttributeValue, type ProductState } from "../app/lib/core/types";
@@ -158,5 +158,46 @@ describe("#2 name search uses documented syntax only", () => {
     const first = await searchPage(gw, f, null);
     expect(first.items).toHaveLength(16);
     expect(first.next).toBeNull();
+  });
+});
+
+describe("#3 collection combined with name, SKU or tag (found live on cartovum-bulk-dev)", () => {
+  const winter = "gid://shopify/Collection/77";
+  function catalogue() {
+    const gw = new MemoryGateway();
+    for (let i = 1; i <= 12; i++) {
+      const p = makeProduct({ title: `CBM Test B${String(i).padStart(2, "0")}`, sku: `CBM-B${String(i).padStart(2, "0")}`, tags: ["batch"], productType: "Tyre", collectionIds: i <= 5 ? [winter] : [] });
+      gw.products.set(p.id, p);
+    }
+    const f1 = makeProduct({ title: "CBM Test F1", tags: ["sale"], productType: "Steel Wheel", collectionIds: [winter] });
+    gw.products.set(f1.id, f1);
+    return gw;
+  }
+
+  it("never sends title, sku or tag clauses together with collection_id", () => {
+    const q = shopifyQuery(parseFilters({ collectionId: winter, search: "CBM Test", skus: "CBM-B01", tags: "batch", productType: "Tyre" }));
+    expect(q).toBe(`collection_id:77 AND product_type:"Tyre" AND ${ANY_STATUS_QUERY}`);
+    expect(shopifyQuery(parseFilters({ search: "CBM", tags: "batch", skus: "CBM-B01" }))).toBe(`title:cbm* AND (sku:"CBM-B01") AND tag:"batch" AND ${ANY_STATUS_QUERY}`);
+  });
+
+  it("the test Shopify reproduces the live behaviour, so the old query finds nothing", async () => {
+    const gw = catalogue();
+    expect(await shopifyAll(gw, `collection_id:77 AND tag:"batch" AND ${ANY_STATUS_QUERY}`)).toHaveLength(0);
+    expect(await shopifyAll(gw, `collection_id:77 AND ${ANY_STATUS_QUERY}`)).toHaveLength(13);
+  });
+
+  it("collection + tag, + name, + SKU, + type + tag all return the right products", async () => {
+    const gw = catalogue();
+    const ids = (titles: string[]) => titles.sort();
+    expect(ids(await allPages(gw, { collectionId: winter, tags: "batch" }))).toEqual(["CBM Test B01", "CBM Test B02", "CBM Test B03", "CBM Test B04", "CBM Test B05"]);
+    expect(ids(await allPages(gw, { collectionId: winter, search: "test f" }))).toEqual(["CBM Test F1"]);
+    expect(ids(await allPages(gw, { collectionId: winter, skus: "CBM-B03, CBM-B09" }))).toEqual(["CBM Test B03"]);
+    expect(ids(await allPages(gw, { collectionId: winter, productType: "Tyre", tags: "batch" }))).toHaveLength(5);
+  });
+
+  it("a count is not treated as exact when the sku clause had to be left out", () => {
+    expect(queryIsExact(parseFilters({ collectionId: winter }))).toBe(true);
+    expect(queryIsExact(parseFilters({ collectionId: winter, skus: "CBM-B01" }))).toBe(false);
+    expect(queryIsExact(parseFilters({ skus: "CBM-B01" }))).toBe(true);
   });
 });

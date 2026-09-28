@@ -35,3 +35,6 @@ app/types/
 
 # Temporary query files written by the development-store seed
 .seed-tmp/
+
+# Functional test run output (the summary report is committed separately)
+test-reports/

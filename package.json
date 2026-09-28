@@ -20,7 +20,8 @@
     "typecheck": "react-router typegen && tsc --noEmit",
     "test": "vitest run",
     "validate:graphql": "node scripts/validate-graphql.mjs",
-    "seed:dev": "vite-node --config vitest.config.ts scripts/seed-dev-store.ts --"
+    "seed:dev": "vite-node --config vitest.config.ts scripts/seed-dev-store.ts --",
+    "test:functional": "vite-node --config vitest.config.ts scripts/functional/run.ts --"
   },
   "type": "module",
   "engines": {

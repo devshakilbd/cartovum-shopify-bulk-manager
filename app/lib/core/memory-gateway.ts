@@ -55,6 +55,8 @@ export class MemoryGateway implements Gateway {
     const statuses = found.length ? found : ["ACTIVE"];
     const titles = [...query.matchAll(/title:(\S+)/g)].map((m) => m[1]);
     if (titles.some((t) => t.startsWith("*"))) return () => false;
+    // Measured on cartovum-bulk-dev: collection_id with a title, sku or tag clause returns nothing.
+    if (/collection_id:/.test(query) && /(^|[\s(])(title|sku|tag):/.test(query)) return () => false;
     const clauses = titles.map((t) => ({ prefix: t.replace(/\*$/, ""), wildcard: t.endsWith("*") }));
     return (p) => {
       if (!statuses.includes(p.status)) return false;

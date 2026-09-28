@@ -1,3 +1,14 @@
 .cache
 build
 node_modules
+# Never ship local secrets, the development database, or test output.
+.env
+.env.*
+!.env.example
+prisma/dev.sqlite
+prisma/dev.sqlite-journal
+*.sqlite
+test-reports
+.seed-tmp
+.shopify
+.git
