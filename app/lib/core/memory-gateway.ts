@@ -1,5 +1,5 @@
 import type { Gateway } from "./gateway";
-import { GatewayError } from "./gateway";
+import { GatewayError, SEARCH_PAGE_MAX } from "./gateway";
 import type { AttributeValue, GlobalAttributeDefinition, ProductState } from "./types";
 
 /**
@@ -31,10 +31,14 @@ export class MemoryGateway implements Gateway {
 
   async searchProducts(query: string, first: number, after: string | null) {
     await this.enter("searchProducts", [query, first, after]);
-    const all = [...this.products.values()].filter((p) => this.shopifyWouldReturn(p, query)).sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+    const wouldReturn = this.shopifyFilter(query);
+    const num = (id: string) => Number(id.slice(id.lastIndexOf("/") + 1));
+    const all = [...this.products.values()].filter(wouldReturn).sort((a, b) => num(a.id) - num(b.id));
+    // Same contract as the real gateway: never more than SEARCH_PAGE_MAX per page (Shopify's cost limit).
+    const size = Math.min(first, SEARCH_PAGE_MAX);
     const start = after ? Number(after) : 0;
-    const products = all.slice(start, start + first).map((p) => structuredClone(p));
-    const next = start + first;
+    const products = all.slice(start, start + size).map((p) => structuredClone(p));
+    const next = start + size;
     return { products, endCursor: next < all.length ? String(next) : null, hasNextPage: next < all.length };
   }
   /**
@@ -44,18 +48,20 @@ export class MemoryGateway implements Gateway {
    * - a leading wildcard is not documented, so `title:*…` is treated as matching nothing.
    * Other clauses are ignored, which returns more, never fewer, products: the app confirms every match.
    */
-  private shopifyWouldReturn(p: ProductState, raw: string): boolean {
+  private shopifyFilter(raw: string): (p: ProductState) => boolean {
     // Quoted values are literal text in Shopify's syntax, so clauses are only looked for outside them.
     const query = raw.replace(/"(?:\\.|[^"\\])*"/g, '""');
-    const statuses = [...query.matchAll(/status:([a-z]+)/g)].map((m) => m[1].toUpperCase());
-    if (!(statuses.length ? statuses : ["ACTIVE"]).includes(p.status)) return false;
-    const titleWords = p.title.toLowerCase().split(/[^\p{L}\p{M}\p{N}]+/u);
-    for (const m of query.matchAll(/title:(\S+)/g)) {
-      if (m[1].startsWith("*")) return false;
-      const prefix = m[1].replace(/\*$/, "");
-      if (!titleWords.some((w) => (m[1].endsWith("*") ? w.startsWith(prefix) : w === prefix))) return false;
-    }
-    return true;
+    const found = [...query.matchAll(/status:([a-z]+)/g)].map((m) => m[1].toUpperCase());
+    const statuses = found.length ? found : ["ACTIVE"];
+    const titles = [...query.matchAll(/title:(\S+)/g)].map((m) => m[1]);
+    if (titles.some((t) => t.startsWith("*"))) return () => false;
+    const clauses = titles.map((t) => ({ prefix: t.replace(/\*$/, ""), wildcard: t.endsWith("*") }));
+    return (p) => {
+      if (!statuses.includes(p.status)) return false;
+      if (!clauses.length) return true;
+      const titleWords = p.title.toLowerCase().split(/[^\p{L}\p{M}\p{N}]+/u);
+      return clauses.every((c) => titleWords.some((w) => (c.wildcard ? w.startsWith(c.prefix) : w === c.prefix)));
+    };
   }
 
   async getProducts(ids: string[]) {

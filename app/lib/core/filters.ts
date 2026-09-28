@@ -1,4 +1,4 @@
-import type { Gateway } from "./gateway";
+import { SEARCH_PAGE_MAX, type Gateway } from "./gateway";
 import { productStockStatus } from "./fingerprint";
 import type { AttributeCondition, Filters, ProductState, ProductStatus, StockStatus } from "./types";
 import { MAX_CONDITIONS, MAX_SKUS, MAX_TAGS, PRODUCT_STATUSES, STOCK_STATUSES } from "./types";
@@ -145,9 +145,10 @@ const CURSOR = /^[\w=+/-]*\|\d{1,3}$/;
 /**
  * One page of matching products. Shopify pages are cursor based, and some filters are confirmed here
  * rather than by Shopify, so the cursor records Shopify's cursor plus the position reached inside that
- * page. At most maxScan products are read per request; the page may then be short, with a next cursor.
+ * page. At most maxScan products are read per request (Shopify returns SEARCH_PAGE_MAX per call, so 500 is
+ * 50 calls); the page may then be short, with a next cursor.
  */
-export async function searchPage(gw: Gateway, f: Filters, cursor: string | null, maxScan = 2000) {
+export async function searchPage(gw: Gateway, f: Filters, cursor: string | null, maxScan = 500) {
   const valid = cursor && CURSOR.test(cursor) ? cursor : "|0";
   let after: string | null = valid.split("|")[0] || null;
   let skip = Number(valid.split("|")[1]);
@@ -155,7 +156,7 @@ export async function searchPage(gw: Gateway, f: Filters, cursor: string | null,
   const items: ProductState[] = [];
   let scanned = 0;
   for (;;) {
-    const page = await gw.searchProducts(query, 25, after);
+    const page = await gw.searchProducts(query, SEARCH_PAGE_MAX, after);
     for (let i = skip; i < page.products.length; i++) {
       if (items.length === f.perPage) return { items, next: `${after ?? ""}|${i}` };
       if (matches(page.products[i], f)) items.push(page.products[i]);

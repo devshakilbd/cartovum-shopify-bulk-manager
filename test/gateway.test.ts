@@ -107,4 +107,19 @@ describe("ShopifyGateway", () => {
     await expect(gw2.writeAttributes("gid://shopify/Product/1", [{ key: "shared.colour", kind: "global", type: "list.single_line_text_field", values: ["X"] }], [])).rejects.toThrow("Value must be one of the choices.");
     expect(c2.calls[0].variables).toEqual({ metafields: [{ ownerId: "gid://shopify/Product/1", namespace: "shared", key: "colour", type: "list.single_line_text_field", value: '["X"]' }] });
   });
+
+  it("stays within Shopify's 1,000-point query cost: at most 10 products per search page, 25 per by-ID read", async () => {
+    // Shopify refused 25 fully-loaded products per search page on cartovum-bulk-dev (MAX_COST_EXCEEDED, 1310).
+    const empty = { data: { products: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } } } };
+    const c = client([() => empty, () => empty]);
+    const gw = new ShopifyGateway(c, DEFAULT_SETTINGS, "a");
+    await gw.searchProducts("", 250, null);
+    await gw.searchProducts("", 25, null);
+    expect(c.calls.map((x) => (x.variables as { first: number }).first)).toEqual([10, 10]);
+
+    const ids = Array.from({ length: 60 }, (_, i) => `gid://shopify/Product/${i + 1}`);
+    const c2 = client([() => ({ data: { nodes: [] } }), () => ({ data: { nodes: [] } }), () => ({ data: { nodes: [] } })]);
+    await new ShopifyGateway(c2, DEFAULT_SETTINGS, "a").getProducts(ids);
+    expect(c2.calls.map((x) => (x.variables as { ids: string[] }).ids.length)).toEqual([25, 25, 10]);
+  });
 });

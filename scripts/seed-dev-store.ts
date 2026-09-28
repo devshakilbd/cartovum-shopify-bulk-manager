@@ -22,8 +22,8 @@ import type { ProductState } from "../app/lib/core/types";
 import { DEFAULT_SETTINGS } from "../app/lib/core/types";
 import { ShopifyGateway } from "../app/lib/gateway.server";
 import { cliAdmin, execute, type CliAdmin } from "./seed/cli-admin";
-import { CREATE_COLLECTION, CREATE_DEFINITION, PREFLIGHT, productSetChunk } from "./seed/documents";
-import { checkSpec, COLLECTIONS, type CollectionRef, DEFINITIONS, EXPECTED_FILTERS, filterInput, PRODUCTS, productSetInput, SEED_TAG, SHARED_NS, STORE } from "./seed/spec";
+import { CREATE_COLLECTION, CREATE_DEFINITION, PREFLIGHT, productSetChunk, VERIFY_COLLECTIONS } from "./seed/documents";
+import { checkSpec, COLLECTIONS, compareCollections, type CollectionRef, DEFINITIONS, EXPECTED_FILTERS, filterInput, PRODUCTS, productSetInput, SEED_TAG, SHARED_NS, SHOPIFY_HOME_COLLECTION, STORE } from "./seed/spec";
 
 const CONFIRM = STORE.replace(".myshopify.com", "");
 const CHUNK = 5;
@@ -174,13 +174,16 @@ async function verify(admin: CliAdmin) {
   } while (after);
   const byHandle = new Map(read.map((p) => [p.handle, p]));
 
-  const collections = await gw.getCollections();
+  const handles = [...Object.values(COLLECTIONS).map((c) => c.handle), SHOPIFY_HOME_COLLECTION];
+  const { collections } = await execute<{ collections: { nodes: { id: string; handle: string; title: string }[] } }>(admin, VERIFY_COLLECTIONS, { query: handles.map((h) => `handle:${h}`).join(" OR ") });
   const collectionIds = {} as Record<CollectionRef, string>;
   for (const [ref, c] of Object.entries(COLLECTIONS) as [CollectionRef, (typeof COLLECTIONS)[CollectionRef]][]) {
-    const found = collections.find((x) => x.title === c.title);
-    if (!found) fail(`Collection "${c.title}" not found.`);
+    const found = collections.nodes.find((x) => x.handle === c.handle);
+    if (!found) fail(`Collection ${c.handle} not found.`);
     collectionIds[ref] = found.id;
   }
+  const homeId = collections.nodes.find((x) => x.handle === SHOPIFY_HOME_COLLECTION)?.id ?? null;
+  const notes: string[] = [];
 
   const problems: string[] = [];
   for (const p of PRODUCTS) {
@@ -195,7 +198,9 @@ async function verify(admin: CliAdmin) {
     diff("status", s.status, p.status);
     diff("product type", s.productType, p.productType);
     diff("tags", [...s.tags].sort(), [...p.tags].sort());
-    diff("collections", [...s.collectionIds].sort(), p.collections.map((c) => collectionIds[c]).sort());
+    const col = compareCollections(s.collectionIds, p.collections.map((c) => collectionIds[c]), homeId);
+    if (col.inHome) notes.push(`${p.id} is also in Shopify's default "Home page" collection (${SHOPIFY_HOME_COLLECTION}), added by Shopify; expected.`);
+    diff("collections", col.got, col.want);
     diff("stock status", productStockStatus(s), p.expect.stock);
     diff("has variants", isMultiVariant(s), p.expect.multiVariant);
     diff("SKUs", s.variants.map((v) => v.sku).sort(), p.variants.map((v) => v.sku).sort());
@@ -237,6 +242,7 @@ async function verify(admin: CliAdmin) {
     if (!ok) problems.push(`Filter "${row.name}": got [${[...got].sort().join(", ")}], expected [${[...row.ids].sort().join(", ")}]`);
   }
 
+  for (const n of notes) out(`  note: ${n}`);
   out(`  Admin API calls: ${admin.calls}`);
   if (problems.length) fail(`Verification found ${problems.length} difference(s):\n  - ${problems.join("\n  - ")}`);
   out("✔ Every seeded product and every expected filter result matches the matrix. Nothing was changed.");

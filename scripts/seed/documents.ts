@@ -15,6 +15,11 @@ export const PREFLIGHT = `#graphql
     collections(first: 10, query: $collections) { nodes { id handle title } }
   }`;
 
+export const VERIFY_COLLECTIONS = `#graphql
+  query CartovumSeedCollections($query: String!) {
+    collections(first: 10, query: $query) { nodes { id handle title } }
+  }`;
+
 export const CREATE_DEFINITION = `#graphql
   mutation CartovumSeedDefinition($definition: MetafieldDefinitionInput!) {
     metafieldDefinitionCreate(definition: $definition) {

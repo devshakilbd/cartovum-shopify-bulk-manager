@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { ANY_STATUS_QUERY } from "./core/filters";
 import type { Gateway } from "./core/gateway";
-import { GatewayError } from "./core/gateway";
+import { GatewayError, IDS_PAGE_MAX, SEARCH_PAGE_MAX } from "./core/gateway";
 import type { AttributeValue, GlobalAttributeDefinition, ProductState, ShopSettings } from "./core/types";
 import { log } from "./log.server";
 
@@ -16,7 +16,6 @@ export interface AdminClient {
 }
 
 const TEXT_TYPES = ["single_line_text_field", "list.single_line_text_field"];
-const PAGE = 25; // Keeps a fully-loaded product page well under the 1,000-point query cost limit.
 
 const PRODUCT_FIELDS = `#graphql
   fragment CartovumProduct on Product {
@@ -204,15 +203,15 @@ export class ShopifyGateway implements Gateway {
   }
 
   async searchProducts(query: string, first: number, after: string | null) {
-    const data = await this.read(SEARCH, { query: query || null, first: Math.min(first, PAGE), after });
+    const data = await this.read(SEARCH, { query: query || null, first: Math.min(first, SEARCH_PAGE_MAX), after });
     const products = await Promise.all(data.products.nodes.map((n: Json) => this.toState(n)));
     return { products, endCursor: data.products.pageInfo.endCursor, hasNextPage: data.products.pageInfo.hasNextPage };
   }
 
   async getProducts(ids: string[]) {
     const out: ProductState[] = [];
-    for (let i = 0; i < ids.length; i += PAGE) {
-      const data = await this.read(BY_IDS, { ids: ids.slice(i, i + PAGE) });
+    for (let i = 0; i < ids.length; i += IDS_PAGE_MAX) {
+      const data = await this.read(BY_IDS, { ids: ids.slice(i, i + IDS_PAGE_MAX) });
       for (const n of data.nodes as Json[]) if (n?.id) out.push(await this.toState(n));
     }
     return out;

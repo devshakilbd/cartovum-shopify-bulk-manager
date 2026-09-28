@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { GatewayError } from "../../app/lib/core/gateway";
 import type { AdminClient } from "../../app/lib/gateway.server";
 import { API_VERSION, STORE } from "./spec";
 
@@ -37,13 +38,27 @@ export function cliAdmin(log: (line: string) => void = () => undefined): CliAdmi
       log(`  → ${name}`);
       client.calls++;
       const args = ["shopify", "app", "execute", "--config", "shopify.app.toml", "--store", STORE, "--version", API_VERSION, "--query-file", qRel, "--variable-file", vRel, "--output-file", oRel, "--no-color"];
+      const isMutation = /^\s*mutation\b/m.test(query.replace(/^\s*#graphql/, ""));
       // npx is a .cmd file on Windows, which Node only starts through a shell. Every argument is fixed text
       // or a generated file name without spaces or shell characters.
-      const run = spawnSync("npx", args, { cwd: ROOT, shell: process.platform === "win32", encoding: "utf8", timeout: 180_000 });
+      const once = () => spawnSync("npx", args, { cwd: ROOT, shell: process.platform === "win32", encoding: "utf8", timeout: 120_000 });
+      let run = once();
+      // Seen on 2026-09-28: the CLI printed "Operation succeeded", wrote its result, and then never exited.
+      // A complete result file is used whatever the exit. A read that hung with no result is tried once more;
+      // a write never is: its outcome is uncertain and must be decided by reading back.
+      if (run.status === null && !existsSync(o) && !isMutation) {
+        log(`    (the CLI did not finish; retrying the read ${name} once)`);
+        run = once();
+      }
       const cliOutput = () => `${run.stdout ?? ""}\n${run.stderr ?? ""}`.trim().slice(-1200);
       try {
-        if (run.status !== 0) throw new Error(`shopify app execute failed (${name}, exit ${run.status}):\n${cliOutput()}`);
-        if (!existsSync(o)) throw new Error(`shopify app execute wrote no result for ${name}. It said:\n${cliOutput()}`);
+        const hung = run.status === null;
+        if (!hung && run.status !== 0) throw new Error(`shopify app execute failed (${name}, exit ${run.status}):\n${cliOutput()}`);
+        if (!existsSync(o)) {
+          if (hung && isMutation) throw new GatewayError(`shopify app execute did not finish ${name}; whether the write happened is unknown. Run verify.`, true);
+          throw new Error(`shopify app execute wrote no result for ${name}${hung ? " (it did not finish)" : ""}. It said:\n${cliOutput()}`);
+        }
+        if (hung) log(`    (the CLI did not exit after writing the result of ${name}; the result is complete and was used)`);
         const raw = readFileSync(o, "utf8");
         let parsed: unknown;
         try {

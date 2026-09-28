@@ -45,6 +45,24 @@ export const COLLECTIONS = {
 } as const;
 export type CollectionRef = keyof typeof COLLECTIONS;
 
+/**
+ * Shopify's default manual "Home page" collection, present in every new store. On 2026-09-28 Shopify put
+ * the store's first product (S1) in it when the seed created it. The seed never writes to it; verify treats
+ * membership in it as expected and lists it as a note, while every Test collection must still match exactly.
+ */
+export const SHOPIFY_HOME_COLLECTION = "frontpage";
+
+/**
+ * Compares a product's collections with the matrix. Only Shopify's Home page collection (homeId) is set aside;
+ * any other extra or missing collection is a difference.
+ */
+export function compareCollections(actual: string[], expected: string[], homeId: string | null) {
+  const inHome = !!homeId && actual.includes(homeId);
+  const got = actual.filter((id) => id !== homeId).sort();
+  const want = [...expected].sort();
+  return { match: JSON.stringify(got) === JSON.stringify(want), got, want, inHome };
+}
+
 export const TYPES = ["Alloy Wheel", "Steel Wheel", "Tyre", "Wheel"] as const;
 export const TAGS = [SEED_TAG, "stock-test", "attr-test", "filter-test", "sale", "winter", "batch", "convert-test", "control"] as const;
 

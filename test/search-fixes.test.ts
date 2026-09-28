@@ -13,6 +13,19 @@ import { DEFAULT_SETTINGS, type AttributeValue, type ProductState } from "../app
 const SHOP = "a.myshopify.com";
 const red: AttributeValue[] = [{ key: "shared.colour", kind: "global", type: "list.single_line_text_field", values: ["Red"] }];
 
+/** Every product Shopify would return for a raw search string, following its cursor (10 per page). */
+async function shopifyAll(gw: MemoryGateway, query: string) {
+  const out: ProductState[] = [];
+  let after: string | null = null;
+  do {
+    const page = await gw.searchProducts(query, 250, after);
+    expect(page.products.length).toBeLessThanOrEqual(10);
+    out.push(...page.products);
+    after = page.hasNextPage ? page.endCursor : null;
+  } while (after);
+  return out;
+}
+
 async function allPages(gw: MemoryGateway, raw: Record<string, unknown>) {
   const f = parseFilters({ perPage: 25, ...raw });
   const seen: ProductState[] = [];
@@ -46,9 +59,9 @@ describe("#1 any status means every status", () => {
 
   it("the test double really does return only Active products for an empty query", async () => {
     const gw = store();
-    const page = await gw.searchProducts("", 250, null);
-    expect(page.products.every((p) => p.status === "ACTIVE")).toBe(true);
-    expect(page.products).toHaveLength(13);
+    const products = await shopifyAll(gw, "");
+    expect(products.every((p) => p.status === "ACTIVE")).toBe(true);
+    expect(products).toHaveLength(13);
   });
 
   it("finds Draft, Archived and Unlisted products when status is Any", async () => {
@@ -117,8 +130,7 @@ describe("#2 name search uses documented syntax only", () => {
     const titles = await allPages(gw, { search: "CBM Test B" });
     expect(titles).toHaveLength(12);
     expect(titles.every((t) => t.startsWith("CBM Test B"))).toBe(true);
-    const old = await gw.searchProducts('title:*CBM Test B* AND ' + ANY_STATUS_QUERY, 250, null);
-    expect(old.products).toHaveLength(0);
+    expect(await shopifyAll(gw, 'title:*CBM Test B* AND ' + ANY_STATUS_QUERY)).toHaveLength(0);
   });
 
   it("matches the start of words in any order, ignoring case and punctuation", () => {
@@ -134,7 +146,7 @@ describe("#2 name search uses documented syntax only", () => {
     const gw = store();
     for (const search of ["CBM", "test b0", "b1", "wheel 18", "black", "heel", "x1 test"]) {
       const f = parseFilters({ search });
-      const byShopify = (await gw.searchProducts(shopifyQuery(f), 250, null)).products.map((p) => p.title).sort();
+      const byShopify = (await shopifyAll(gw, shopifyQuery(f))).map((p) => p.title).sort();
       const byApp = [...gw.products.values()].filter((p) => matches(p, f)).map((p) => p.title).sort();
       expect(byShopify, search).toEqual(byApp);
     }

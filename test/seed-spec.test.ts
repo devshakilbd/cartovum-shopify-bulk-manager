@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { buildClientSchema, parse, validate } from "graphql";
 import { describe, expect, it } from "vitest";
-import { CREATE_COLLECTION, CREATE_DEFINITION, PREFLIGHT, productSetChunk } from "../scripts/seed/documents";
-import { checkSpec, DEFINITIONS, EXPECTED_FILTERS, FAKE_COLLECTION_IDS, PRODUCTS, productSetInput, SEED_TAG, STORE, type ProductSpec } from "../scripts/seed/spec";
+import { CREATE_COLLECTION, CREATE_DEFINITION, PREFLIGHT, productSetChunk, VERIFY_COLLECTIONS } from "../scripts/seed/documents";
+import { checkSpec, compareCollections, DEFINITIONS, EXPECTED_FILTERS, FAKE_COLLECTION_IDS, PRODUCTS, productSetInput, SEED_TAG, STORE, type ProductSpec } from "../scripts/seed/spec";
 
 /** The development-store seed, checked offline. Nothing here talks to Shopify. */
 
@@ -49,6 +49,25 @@ describe("seed matrix", () => {
   });
 });
 
+describe("collection comparison in verify", () => {
+  const home = "gid://shopify/Collection/100";
+  const alloy = "gid://shopify/Collection/1";
+  const winter = "gid://shopify/Collection/2";
+
+  it("sets aside only Shopify's Home page collection, and says so (S1 on the dev store)", () => {
+    expect(compareCollections([home, alloy], [alloy], home)).toEqual({ match: true, got: [alloy], want: [alloy], inHome: true });
+    expect(compareCollections([alloy], [alloy], home)).toMatchObject({ match: true, inHome: false });
+  });
+
+  it("still fails on any other extra or missing collection", () => {
+    expect(compareCollections([alloy, winter], [alloy], home).match).toBe(false);
+    expect(compareCollections([home], [alloy], home).match).toBe(false);
+    expect(compareCollections([], [winter], home).match).toBe(false);
+    // Without a Home page collection in the store, nothing is set aside.
+    expect(compareCollections([home, alloy], [alloy], null).match).toBe(false);
+  });
+});
+
 describe("productSet input", () => {
   it("untracked variants get no quantity; tracked ones get an explicit on-hand quantity, including 0", () => {
     const s1 = productSetInput(byId("S1"), LOC, FAKE_COLLECTION_IDS).variants[0];
@@ -92,7 +111,7 @@ describe.skipIf(!existsSync(SCHEMA))("seed GraphQL documents against the 2026-07
   it("every document is valid", () => {
     const json = JSON.parse(readFileSync(SCHEMA, "utf8"));
     const schema = buildClientSchema(json.data ?? json);
-    for (const doc of [PREFLIGHT, CREATE_DEFINITION, CREATE_COLLECTION, productSetChunk(1), productSetChunk(5)]) {
+    for (const doc of [PREFLIGHT, VERIFY_COLLECTIONS, CREATE_DEFINITION, CREATE_COLLECTION, productSetChunk(1), productSetChunk(5)]) {
       expect(validate(schema, parse(doc)).map((e) => e.message)).toEqual([]);
     }
   });
